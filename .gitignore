@@ -13,3 +13,28 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# User-specific files
+.idea/shelf/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries/
+.idea/vcs.xml
+.idea/httpRequests/
+
+# === Gradle ===
+.gradle/
+gradle-app.setting
+gradle-app.setting.lock
+# === Kotlin Symbol Processing (KSP) ===
+build/generated/ksp/
+
+# === Log files ===
+*.log
+# === Local configuration ===
+
+*.keystore
+*.jks
+# === Android Studio Profiling ===
+*.hprof
+
