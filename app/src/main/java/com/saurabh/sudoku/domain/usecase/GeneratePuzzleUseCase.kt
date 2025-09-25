@@ -1,6 +1,7 @@
 package com.saurabh.sudoku.domain.usecase
 
-import SudokuGenerator
+
+import com.saurabh.sudoku.data.generator.SudokuGenerator
 import com.saurabh.sudoku.domain.model.Difficulty
 import com.saurabh.sudoku.domain.model.Game
 import com.saurabh.sudoku.domain.model.GameState

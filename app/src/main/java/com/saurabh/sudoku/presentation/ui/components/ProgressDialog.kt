@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.saurabh.sudoku.domain.model.Difficulty
+import com.saurabh.sudoku.utils.formatTime
 
 @Composable
 fun GameCompletedDialog(

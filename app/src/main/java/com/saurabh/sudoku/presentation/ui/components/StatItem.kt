@@ -10,7 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 
 @Composable
-private fun StatItem(
+fun StatItem(
     label: String,
     value: String,
     modifier: Modifier = Modifier

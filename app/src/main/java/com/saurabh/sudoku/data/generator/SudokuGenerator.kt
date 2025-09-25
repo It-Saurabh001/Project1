@@ -1,11 +1,13 @@
+package com.saurabh.sudoku.data.generator
+
 import com.saurabh.sudoku.data.generator.SudokuSolver
 import com.saurabh.sudoku.domain.model.Difficulty
 import com.saurabh.sudoku.domain.model.SudokuBoard
-import kotlin.random.Random
+
 
 class SudokuGenerator {
 
-    private val solver = SudokuSolver()
+     val solver = SudokuSolver()
 
     fun generatePuzzle(difficulty: Difficulty): SudokuBoard {
         val solution = generateCompleteSudoku()
@@ -23,7 +25,7 @@ class SudokuGenerator {
         )
     }
 
-    private fun generateCompleteSudoku(): Array<IntArray> {
+     fun generateCompleteSudoku(): Array<IntArray> {
         val board = Array(9) { IntArray(9) }
         fillBoard(board)
         return board

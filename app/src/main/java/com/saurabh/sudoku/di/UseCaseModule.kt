@@ -1,6 +1,7 @@
 package com.saurabh.sudoku.di
 
-import SudokuGenerator
+
+import com.saurabh.sudoku.data.generator.SudokuGenerator
 import com.saurabh.sudoku.data.generator.SudokuSolver
 import dagger.Module
 import dagger.Provides
