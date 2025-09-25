@@ -60,16 +60,27 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
+    implementation(libs.kotlinx.coroutines.android)
+
     // Jetpack Navigation for Compose
-    implementation("androidx.navigation:navigation-compose:2.9.3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
 //    implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.coil.compose)
     // hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // KSP (for Room, etc.)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+
+    // Gson for JSON serialization
+    implementation(libs.gson)
 
 }
