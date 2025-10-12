@@ -1,6 +1,7 @@
 package com.saurabh.sudoku.domain.usecase
 
 
+import android.util.Log
 import com.saurabh.sudoku.data.generator.SudokuGenerator
 import com.saurabh.sudoku.domain.model.Difficulty
 import com.saurabh.sudoku.domain.model.Game
@@ -14,7 +15,9 @@ class GeneratePuzzleUseCase @Inject constructor(
     private val sudokuGenerator: SudokuGenerator,
     private val gameRepository: GameRepository
 ) {
+    private val TAG = "SudokuDebug_UseCase"
     suspend operator fun invoke(difficulty: Difficulty): Game {
+        Log.d(TAG, "GeneratePuzzleUseCase: Generating new puzzle with difficulty ${difficulty.name}")
         val board = sudokuGenerator.generatePuzzle(difficulty)
         val currentTime = DateUtils.getCurrentTimestamp()
         val gameId = UUID.randomUUID().toString()
@@ -29,7 +32,7 @@ class GeneratePuzzleUseCase @Inject constructor(
             hintsUsed = 0,
             createdAt = currentTime
         )
-
+        Log.d(TAG, "GeneratePuzzleUseCase: New game created with ID $gameId. Saving to repository.")
         gameRepository.saveGame(game)
         return game
     }

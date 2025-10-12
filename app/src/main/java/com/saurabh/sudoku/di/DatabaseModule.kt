@@ -1,6 +1,9 @@
 package com.saurabh.sudoku.di
 
 import android.content.Context
+import com.google.gson.Gson
+import com.saurabh.sudoku.data.generator.SudokuGenerator
+import com.saurabh.sudoku.data.generator.SudokuSolver
 import com.saurabh.sudoku.data.local.database.SudokuDatabase
 import com.saurabh.sudoku.data.local.database.dao.GameDao
 import com.saurabh.sudoku.data.local.database.dao.PuzzleDao
@@ -11,7 +14,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import jakarta.inject.Singleton
+import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent :: class)
@@ -45,7 +48,20 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideGson(): com.google.gson.Gson {
-        return com.google.gson.Gson()
+    fun provideGson(): Gson {
+        return Gson()
+    }
+
+    // --- START OF REFACTOR: Moved from UseCaseModule ---
+    @Provides
+    @Singleton
+    fun provideSudokuSolver(): SudokuSolver {
+        return SudokuSolver()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSudokuGenerator(solver: SudokuSolver): SudokuGenerator {
+        return SudokuGenerator(solver)
     }
 }
