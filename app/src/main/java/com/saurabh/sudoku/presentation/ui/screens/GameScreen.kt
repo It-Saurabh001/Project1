@@ -1,19 +1,37 @@
 package com.saurabh.sudoku.presentation.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saurabh.sudoku.domain.model.GameState
 import com.saurabh.sudoku.presentation.ui.components.GameCompletedDialog
 import com.saurabh.sudoku.presentation.ui.components.GameToolbar
@@ -23,6 +41,7 @@ import com.saurabh.sudoku.presentation.ui.components.SudokuBoard
 import com.saurabh.sudoku.presentation.viewmodel.GameViewModel
 import com.saurabh.sudoku.utils.Constants
 import com.saurabh.sudoku.utils.OnLifecycleEvent
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +51,9 @@ fun GameScreen(
     modifier: Modifier = Modifier,
     viewModel: GameViewModel = hiltViewModel()
 ) {
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val TAG = "SudokuDebug" // <-- Add a tag for easy filtering
 
     // Load game on first composition
     LaunchedEffect(gameId) {
@@ -194,7 +215,11 @@ fun GameScreen(
         // Number Pad
         if (game.state != GameState.PAUSED && game.state != GameState.COMPLETED) {
             NumberPad(
-                onNumberSelected = viewModel::onNumberSelected,
+                numberCounts = uiState.numberCounts,
+                onNumberSelected = {number->
+                    Log.d(TAG, "GameScreen: NumberPad callback triggered with number '$number'. Calling viewModel.") // <-- ADDED LOG
+                    viewModel.onNumberSelected(number)
+                },
                 onEraseSelected = viewModel::onEraseSelected,
                 modifier = Modifier.fillMaxWidth()
             )

@@ -8,6 +8,32 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 
 object GameUtils {
+
+    data class Hint(val row: Int, val col: Int, val value: Int)
+
+
+    fun getHint(currentBoard: Array<IntArray>, solution: Array<IntArray>): Hint? {
+        val emptyCells = mutableListOf<Pair<Int, Int>>()
+        for (r in currentBoard.indices) {
+            for (c in currentBoard[r].indices) {
+                if (currentBoard[r][c] == Constants.EMPTY_CELL) {
+                    emptyCells.add(r to c)
+                }
+            }
+        }
+
+        if (emptyCells.isEmpty()) {
+            return null // No empty cells left to give a hint for
+        }
+
+        // Pick a random empty cell
+        val (row, col) = emptyCells.random()
+        val solutionValue = solution[row][col]
+
+        return Hint(row, col, solutionValue)
+    }
+
+
     fun isValidMove(board: Array<IntArray>, row: Int, col: Int, num: Int): Boolean {
         // Check row
         for (x in 0..8) {

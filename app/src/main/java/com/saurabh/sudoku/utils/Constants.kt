@@ -1,7 +1,7 @@
 package com.saurabh.sudoku.utils
 
 object Constants {
-    const val BOARD_SIZE = 9
+    const val GRID_SIZE = 9
     const val BOX_SIZE = 3
     const val EMPTY_CELL = 0
     const val MAX_HINTS = 3

@@ -1,13 +1,11 @@
 package com.saurabh.sudoku.data.generator
 
-import com.saurabh.sudoku.data.generator.SudokuSolver
 import com.saurabh.sudoku.domain.model.Difficulty
 import com.saurabh.sudoku.domain.model.SudokuBoard
+import javax.inject.Inject
 
 
-class SudokuGenerator {
-
-     val solver = SudokuSolver()
+class SudokuGenerator @Inject constructor(private val solver: SudokuSolver) {
 
     fun generatePuzzle(difficulty: Difficulty): SudokuBoard {
         val solution = generateCompleteSudoku()
