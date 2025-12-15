@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,13 +29,13 @@ fun EraseButton(
         modifier = modifier
             .height(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(ButtonSecondary)
+            .background(MaterialTheme.colorScheme.secondaryContainer)
             .clickable { onClick() }
             .padding(8.dp)
     ) {
         Text(
             text = "Erase",
-            color = Color.White,
+            color =MaterialTheme.colorScheme.onSecondaryContainer,
             fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center

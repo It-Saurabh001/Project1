@@ -10,9 +10,10 @@ import com.saurabh.sudoku.domain.model.GameState
 import com.saurabh.sudoku.domain.repository.GameRepository
 import com.saurabh.sudoku.domain.repository.StatisticsRepository
 import com.saurabh.sudoku.presentation.uistate.GameUiState
-import com.saurabh.sudoku.utils.Constants
-import com.saurabh.sudoku.utils.DateUtils
-import com.saurabh.sudoku.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.Constants
+import com.saurabh.sudoku.presentation.utils.DateUtils
+import com.saurabh.sudoku.presentation.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.deepCopy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -286,8 +287,7 @@ class GameViewModel @Inject constructor(
 
     fun onNewGame() {
         val currentDifficulty = currentGame?.difficulty ?: Difficulty.MEDIUM
-        viewModelScope.launch {
-            _uiState.update { it.copy(isGeneratingNewGame = true) }
+        viewModelScope.launch {_uiState.update { it.copy(isGeneratingNewGame = true) }
             try {
                 // Logic from GeneratePuzzleUseCase
                 Log.d(TAG, "GeneratePuzzle: Generating new puzzle with difficulty ${currentDifficulty.name}")
@@ -296,6 +296,7 @@ class GameViewModel @Inject constructor(
                 val newGame = Game(
                     id = UUID.randomUUID().toString(),
                     board = board,
+                    initialBoard = board.deepCopy(), // <-- FIX: Provide the initial board here
                     difficulty = currentDifficulty,
                     startTime = currentTime,
                     currentTime = currentTime,
@@ -334,6 +335,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+
     fun onHintRequested() {
         val game = currentGame ?: return
         if (game.hintsUsed >= Constants.MAX_HINTS) return
@@ -360,6 +362,38 @@ class GameViewModel @Inject constructor(
         } else {
             _uiState.update { it.copy(hintMessage = "No more hints available or board is full!") }
         }
+    }
+    fun onResetBoard() = viewModelScope.launch {
+        // Ensure we have a game to reset
+        val currentGame = _uiState.value.game ?: return@launch
+
+        // Create a new board state by copying the initial puzzle
+        val newBoard = currentGame.initialBoard.deepCopy()
+
+        // Update the game state with the reset board
+        val updatedGame = currentGame.copy(
+            board = newBoard,
+            state = GameState.PLAYING, // Ensure game is playable
+            hintsUsed = 0 // Reset hints used
+        )
+        this@GameViewModel.currentGame = updatedGame
+
+        // Clear the move history
+        moveHistory.clear()
+        moveIndex = -1
+
+        // Update the UI state
+        _uiState.update {
+            it.copy(
+                game = updatedGame,
+                selectedCell = null,
+                conflictCells = emptySet()
+            )
+        }
+        updateNumberCounts(updatedGame) // Recalculate number counts
+
+        // Persist the changes
+        gameRepository.updateGame(updatedGame)
     }
 
     fun onPauseToggle() {

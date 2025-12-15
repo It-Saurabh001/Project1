@@ -10,7 +10,7 @@ import com.saurabh.sudoku.domain.model.Statistics
 import com.saurabh.sudoku.domain.repository.GameRepository
 import com.saurabh.sudoku.domain.repository.StatisticsRepository
 import com.saurabh.sudoku.presentation.uistate.HomeUiState
-import com.saurabh.sudoku.utils.DateUtils
+import com.saurabh.sudoku.presentation.utils.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -62,7 +62,8 @@ class HomeViewModel @Inject constructor(
                     currentTime = currentTime,
                     state = GameState.PLAYING,
                     hintsUsed = 0,
-                    createdAt = currentTime
+                    createdAt = currentTime,
+                    initialBoard = board.copy()
                 )
                 gameRepository.saveGame(game)
                 // ---

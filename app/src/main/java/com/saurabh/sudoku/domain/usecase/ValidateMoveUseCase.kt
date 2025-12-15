@@ -2,7 +2,7 @@ package com.saurabh.sudoku.domain.usecase
 
 import android.util.Log
 import com.saurabh.sudoku.domain.model.SudokuBoard
-import com.saurabh.sudoku.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.GameUtils
 import javax.inject.Inject
 
 class ValidateMoveUseCase @Inject constructor() {

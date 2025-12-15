@@ -4,8 +4,8 @@ import android.util.Log
 import com.saurabh.sudoku.domain.model.Game
 import com.saurabh.sudoku.domain.model.GameState
 import com.saurabh.sudoku.domain.repository.StatisticsRepository
-import com.saurabh.sudoku.utils.DateUtils
-import com.saurabh.sudoku.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.DateUtils
+import com.saurabh.sudoku.presentation.utils.GameUtils
 import javax.inject.Inject
 
 class CheckGameCompletionUseCase @Inject constructor(

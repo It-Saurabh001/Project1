@@ -1,4 +1,4 @@
-package com.saurabh.sudoku.utils
+package com.saurabh.sudoku.presentation.utils
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -6,12 +6,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 object GameUtils {
-
     data class Hint(val row: Int, val col: Int, val value: Int)
-
-
     fun getHint(currentBoard: Array<IntArray>, solution: Array<IntArray>): Hint? {
         val emptyCells = mutableListOf<Pair<Int, Int>>()
         for (r in currentBoard.indices) {
@@ -173,7 +171,7 @@ fun Long.formatTime(): String {
 @Composable
 fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) -> Unit) {
     val eventHandler = rememberUpdatedState(onEvent)
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { owner, event ->

@@ -1,6 +1,6 @@
 package com.saurabh.sudoku.data.generator
 
-import com.saurabh.sudoku.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.GameUtils
 
 class SudokuSolver {
 

@@ -3,6 +3,7 @@ package com.saurabh.sudoku.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.saurabh.sudoku.domain.repository.PreferencesRepository
+import com.saurabh.sudoku.presentation.utils.HapticFeedbackManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -11,7 +12,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val hapticFeedbackManager: HapticFeedbackManager
 ) : ViewModel(){
 
     val themeMode = preferencesRepository.themeMode
@@ -72,7 +74,12 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowHints(enabled: Boolean) = viewModelScope.launch { preferencesRepository.updateShowHints(enabled) }
 
-    fun setVibrationEnabled(enabled: Boolean) = viewModelScope.launch { preferencesRepository.updateVibrationEnabled(enabled) }
+    fun setVibrationEnabled(enabled: Boolean) = viewModelScope.launch{
+        preferencesRepository.updateVibrationEnabled(enabled)
+        if(enabled){
+            hapticFeedbackManager.performVibration()  // vibration on action enabled in settings
+        }
+    }
 
     fun setHighlightErrors(enabled: Boolean) =  viewModelScope.launch { preferencesRepository.updateHighlightErrors(enabled) }
 

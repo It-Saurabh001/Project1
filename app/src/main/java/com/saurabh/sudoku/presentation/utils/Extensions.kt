@@ -1,4 +1,4 @@
-package com.saurabh.sudoku.utils
+package com.saurabh.sudoku.presentation.utils
 
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver

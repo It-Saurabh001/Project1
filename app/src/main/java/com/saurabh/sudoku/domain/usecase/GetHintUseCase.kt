@@ -1,7 +1,7 @@
 package com.saurabh.sudoku.domain.usecase
 
 import com.saurabh.sudoku.domain.model.Game
-import com.saurabh.sudoku.utils.Constants
+import com.saurabh.sudoku.presentation.utils.Constants
 import javax.inject.Inject
 import kotlin.random.Random
 

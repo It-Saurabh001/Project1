@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.components
 
+import androidx.compose.animation.core.copy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,16 +38,17 @@ fun SudokuCell(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = when {
-        hasConflict -> CellError
-        isSelected -> CellSelected
-        isInitial -> CellFixed
-        else -> CellDefault
+        hasConflict -> MaterialTheme.colorScheme.errorContainer
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        isInitial -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.surface
+
     }
 
     val textColor = when {
-        hasConflict -> TextError
-        isInitial -> TextPrimary
-        else -> TextSecondary
+        hasConflict -> MaterialTheme.colorScheme.onErrorContainer
+        isInitial -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.primary
     }
 
     Box(

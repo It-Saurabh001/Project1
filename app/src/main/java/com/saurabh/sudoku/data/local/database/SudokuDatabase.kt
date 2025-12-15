@@ -10,7 +10,7 @@ import com.saurabh.sudoku.data.local.database.dao.StatisticsDao
 import com.saurabh.sudoku.data.local.database.entities.GameEntity
 import com.saurabh.sudoku.data.local.database.entities.PuzzleEntity
 import com.saurabh.sudoku.data.local.database.entities.StatisticsEntity
-import com.saurabh.sudoku.utils.Constants
+import com.saurabh.sudoku.presentation.utils.Constants
 
 @Database(
     entities = [

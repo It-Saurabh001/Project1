@@ -9,7 +9,7 @@ import com.saurabh.sudoku.domain.model.Game
 import com.saurabh.sudoku.domain.model.GameState
 import com.saurabh.sudoku.domain.model.SudokuBoard
 import com.saurabh.sudoku.domain.repository.GameRepository
-import com.saurabh.sudoku.utils.DateUtils
+import com.saurabh.sudoku.presentation.utils.DateUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -73,6 +73,12 @@ class GameRepositoryImpl @Inject constructor(
             board = SudokuBoard(
                 board = gson.fromJson(board, boardType),
                 solution = gson.fromJson(solution, boardType),
+                // FIX: Add the missing initialBoard parameter here
+                initialBoard = gson.fromJson(initialBoard, boardType)
+            ),
+            initialBoard = SudokuBoard(
+                board = gson.fromJson(initialBoard, boardType),
+                solution = gson.fromJson(solution, boardType),
                 initialBoard = gson.fromJson(initialBoard, boardType)
             ),
             difficulty = Difficulty.fromString(difficulty),
@@ -81,7 +87,8 @@ class GameRepositoryImpl @Inject constructor(
             state = GameState.valueOf(state),
             hintsUsed = hintsUsed,
             createdAt = createdAt,
-            completedAt = completedAt
+            completedAt = completedAt,
+
         )
     }
 

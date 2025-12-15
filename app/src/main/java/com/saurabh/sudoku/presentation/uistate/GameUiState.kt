@@ -1,7 +1,7 @@
 package com.saurabh.sudoku.presentation.uistate
 
 import com.saurabh.sudoku.domain.model.Game
-import com.saurabh.sudoku.utils.GameUtils
+import com.saurabh.sudoku.presentation.utils.GameUtils
 
 data class GameUiState(
     val game: Game? = null,

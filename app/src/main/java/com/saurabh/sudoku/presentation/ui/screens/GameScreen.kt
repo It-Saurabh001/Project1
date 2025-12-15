@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,9 +20,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,9 +42,9 @@ import com.saurabh.sudoku.presentation.ui.components.LoadingDialog
 import com.saurabh.sudoku.presentation.ui.components.NumberPad
 import com.saurabh.sudoku.presentation.ui.components.SudokuBoard
 import com.saurabh.sudoku.presentation.viewmodel.GameViewModel
-import com.saurabh.sudoku.utils.Constants
-import com.saurabh.sudoku.utils.OnLifecycleEvent
-import android.util.Log
+import com.saurabh.sudoku.presentation.utils.Constants
+import com.saurabh.sudoku.presentation.utils.OnLifecycleEvent
+import com.saurabh.sudoku.presentation.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,15 +52,16 @@ fun GameScreen(
     gameId: String,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: GameViewModel = hiltViewModel()
+    gameViewModel: GameViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
 
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val TAG = "SudokuDebug" // <-- Add a tag for easy filtering
+    val uiState by gameViewModel.uiState.collectAsStateWithLifecycle()
+    val highlightErrors by settingsViewModel.highlightErrors.collectAsStateWithLifecycle()
 
     // Load game on first composition
     LaunchedEffect(gameId) {
-        viewModel.loadGame(gameId)
+        gameViewModel.loadGame(gameId)
     }
 
     // Handle lifecycle events
@@ -65,14 +69,11 @@ fun GameScreen(
         when (event) {
             Lifecycle.Event.ON_PAUSE -> {
                 if (uiState.game?.state == GameState.PLAYING) {
-                    viewModel.onPauseToggle()
+                    gameViewModel.onPauseToggle()
                 }
             }
-            Lifecycle.Event.ON_RESUME -> {
-                if (uiState.game?.state == GameState.PAUSED) {
-                    viewModel.onPauseToggle()
-                }
-            }
+            // No need to auto-resume, user can do it manually.
+            // This prevents the game from unpausing unexpectedly.
             else -> {}
         }
     }
@@ -89,11 +90,10 @@ fun GameScreen(
     }
 
     // Show error
-    uiState.error?.let { error ->
-        LaunchedEffect(error) {
-            // Show error and navigate back
+    uiState.error?.let {
+        LaunchedEffect(it) {
             onNavigateBack()
-            viewModel.clearError()
+            gameViewModel.clearError()
         }
         return
     }
@@ -107,24 +107,24 @@ fun GameScreen(
             completionTime = uiState.completionTime!!,
             hintsUsed = game.hintsUsed,
             onNewGame = {
-                viewModel.dismissCompletionDialog()
-                viewModel.onNewGame()
+                gameViewModel.dismissCompletionDialog()
+                gameViewModel.onNewGame()
             },
             onMainMenu = {
-                viewModel.dismissCompletionDialog()
+                gameViewModel.dismissCompletionDialog()
                 onNavigateBack()
             }
         )
     }
 
     // Show hint dialog
-    uiState.showHint?.let { hint ->
+    uiState.showHint?.let {
         AlertDialog(
-            onDismissRequest = viewModel::dismissHint,
+            onDismissRequest = gameViewModel::dismissHint,
             title = { Text("Hint") },
             text = { Text(uiState.hintMessage ?: "") },
             confirmButton = {
-                TextButton(onClick = viewModel::dismissHint) {
+                TextButton(onClick = gameViewModel::dismissHint) {
                     Text("OK")
                 }
             }
@@ -136,95 +136,74 @@ fun GameScreen(
         LoadingDialog(message = "Generating new puzzle...")
     }
 
-    Column(
+    Scaffold(
         modifier = modifier
             .testTag("game_screen")
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Top App Bar
-        TopAppBar(
-            title = {
-                Text("${game.difficulty.displayName} Sudoku")
-            },
-            navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-            }
-        )
-
-        // Game Toolbar
-        GameToolbar(
-            elapsedTime = game.elapsedTime,
-            hintsRemaining = Constants.MAX_HINTS - game.hintsUsed,
-            isPaused = game.state == GameState.PAUSED,
-            onPauseClick = viewModel::onPauseToggle,
-            onHintClick = viewModel::onHintRequested,
-            onUndoClick = viewModel::onUndoMove,
-            onRedoClick = viewModel::onRedoMove,
-            onNewGameClick = viewModel::onNewGame,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Game Board
-        if (game.state == GameState.PAUSED) {
-            // Show paused state
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Game Paused",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tap resume to continue",
-                            style = MaterialTheme.typography.bodyMedium
+            .fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("${game.difficulty.displayName} Sudoku") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
                         )
                     }
-                }
-            }
-        } else {
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Game Toolbar
+            GameToolbar(
+                elapsedTime = game.elapsedTime,
+                hintsRemaining = Constants.MAX_HINTS - game.hintsUsed,
+                isPaused = game.state == GameState.PAUSED,
+                onPauseClick = gameViewModel::onPauseToggle,
+                onHintClick = gameViewModel::onHintRequested,
+                onUndoClick = gameViewModel::onUndoMove,
+                onRedoClick = gameViewModel::onRedoMove,
+                onResetClick = gameViewModel::onResetBoard,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // --- UPDATED LOGIC ---
+            // The SudokuBoard and NumberPad are now always visible,
+            // regardless of the pause state.
+
+            // Game Board
             SudokuBoard(
                 board = game.board,
                 selectedCell = uiState.selectedCell,
                 conflictCells = uiState.conflictCells,
-                highlightErrors = true,
-                onCellClick = viewModel::onCellSelected,
+                highlightErrors = highlightErrors,
+                onCellClick = gameViewModel::onCellSelected,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             )
-        }
 
-        // Number Pad
-        if (game.state != GameState.PAUSED && game.state != GameState.COMPLETED) {
-            NumberPad(
-                numberCounts = uiState.numberCounts,
-                onNumberSelected = {number->
-                    Log.d(TAG, "GameScreen: NumberPad callback triggered with number '$number'. Calling viewModel.") // <-- ADDED LOG
-                    viewModel.onNumberSelected(number)
-                },
-                onEraseSelected = viewModel::onEraseSelected,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+            // Number Pad (only hidden when game is completed)
+            if (game.state != GameState.COMPLETED) {
+                NumberPad(
+                    numberCounts = uiState.numberCounts,
+                    onNumberSelected = gameViewModel::onNumberSelected,
+                    onEraseSelected = gameViewModel::onEraseSelected,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.saurabh.sudoku.domain.model
 data class Game(
     val id: String,
     val board: SudokuBoard,
+    val initialBoard: SudokuBoard,
     val difficulty: Difficulty,
     val startTime: Long,
     val currentTime: Long,

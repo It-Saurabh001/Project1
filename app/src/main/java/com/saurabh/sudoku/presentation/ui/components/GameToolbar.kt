@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -20,7 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.saurabh.sudoku.presentation.ui.theme.SudokuTimerTextStyle
-import com.saurabh.sudoku.utils.formatTime
+import com.saurabh.sudoku.presentation.utils.formatTime
 
 @Composable
 fun GameToolbar(
@@ -31,7 +33,7 @@ fun GameToolbar(
     onHintClick: () -> Unit,
     onUndoClick: () -> Unit,
     onRedoClick: () -> Unit,
-    onNewGameClick: () -> Unit,
+    onResetClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -65,20 +67,20 @@ fun GameToolbar(
             )
 
             ToolbarButton(
-                icon = Icons.Default.Undo,
+                icon = Icons.AutoMirrored.Filled.Undo,
                 onClick = onUndoClick,
                 contentDescription = "Undo"
             )
 
             ToolbarButton(
-                icon = Icons.Default.Redo,
+                icon = Icons.AutoMirrored.Filled.Redo,
                 onClick = onRedoClick,
                 contentDescription = "Redo"
             )
 
             ToolbarButton(
                 icon = Icons.Default.Refresh,
-                onClick = onNewGameClick,
+                onClick = onResetClick,
                 contentDescription = "New Game"
             )
         }

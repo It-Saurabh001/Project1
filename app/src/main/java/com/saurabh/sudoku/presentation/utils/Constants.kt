@@ -1,4 +1,4 @@
-package com.saurabh.sudoku.utils
+package com.saurabh.sudoku.presentation.utils
 
 object Constants {
     const val GRID_SIZE = 9

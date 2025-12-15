@@ -9,7 +9,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,8 +26,8 @@ fun HomeScreen(
     onNavigateToStatistics: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val viewModel :HomeViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentGame by viewModel.currentGame.collectAsStateWithLifecycle()
     val statistics by viewModel.statistics.collectAsStateWithLifecycle()
@@ -46,70 +45,65 @@ fun HomeScreen(
         LoadingDialog(message = "Generating new puzzle...")
     }
 
-    // Show error snackbar
-    uiState.error?.let { error ->
-        LaunchedEffect(error) {
-            // Show snackbar or toast
-            viewModel.clearError()
-        }
-    }
+    Scaffold(
+        modifier = modifier.testTag("home_screen").fillMaxSize()
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // App Title
+            Text(
+                text = "Sudoku",
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 32.dp, bottom = 16.dp)
+            )
 
-    Column(
-        modifier = modifier
-            .testTag("home_screen")
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // App Title
-        Text(
-            text = "Sudoku",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 32.dp)
-        )
+            // Continue Game Section
+            currentGame?.let { game ->
+                if (game.state != GameState.COMPLETED) {
+                    ContinueGameCard(
+                        game = game,
+                        onContinueClick = { viewModel.continueCurrentGame() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
-        // Continue Game Section
-        currentGame?.let { game ->
-            if (game.state != GameState.COMPLETED) {
-                ContinueGameCard(
-                    game = game,
-                    onContinueClick = { viewModel.continueCurrentGame() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp)
+            // New Game Section
+            NewGameSection(
+                selectedDifficulty = uiState.selectedDifficulty,
+                onDifficultySelected = viewModel::onDifficultySelected,
+                onStartNewGame = viewModel::startNewGame,
+                isLoading = uiState.isGeneratingPuzzle,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Quick Stats
+            statistics?.let { stats ->
+                QuickStatsCard(
+                    statistics = stats,
+                    onViewAllStats = onNavigateToStatistics,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-        }
 
-        // New Game Section
-        NewGameSection(
-            selectedDifficulty = uiState.selectedDifficulty,
-            onDifficultySelected = viewModel::onDifficultySelected,
-            onStartNewGame = viewModel::startNewGame,
-            isLoading = uiState.isGeneratingPuzzle,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
-        )
+            // Settings Button
+            OutlinedButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Settings")
+            }
 
-        // Quick Stats
-        QuickStatsCard(
-            statistics = statistics,
-            onViewAllStats = onNavigateToStatistics,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
-        )
-
-        // Settings Button
-        OutlinedButton(
-            onClick = onNavigateToSettings,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Settings")
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
