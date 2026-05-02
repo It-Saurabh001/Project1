@@ -1,12 +1,8 @@
 package com.saurabh.sudoku.presentation.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,13 +33,13 @@ fun AchievementStatsCard(
             ) {
                 StatCard(
                     title = "Current Streak",
-                    value = "${statistics.currentStreak} 🔥",
+                    value = "${statistics.currentStreak}",  // Sirf number, 🔥 nahi
                     modifier = Modifier.weight(1f)
                 )
 
                 StatCard(
                     title = "Longest Streak",
-                    value = "${statistics.longestStreak} 🏆",
+                    value = "${statistics.longestStreak}",  // Sirf number, 🏆 nahi
                     modifier = Modifier.weight(1f)
                 )
             }

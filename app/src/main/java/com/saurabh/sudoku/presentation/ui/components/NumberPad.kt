@@ -1,15 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.components
 
-
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +15,10 @@ fun NumberPad(
     onEraseSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Row(
             modifier = modifier
                 .testTag("number_pad")
@@ -34,23 +27,22 @@ fun NumberPad(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Number buttons 1-9
             for (number in 1..9) {
                 val count = numberCounts.getOrDefault(number, 0)
-                val isEnabled = count < Constants.GRID_SIZE // GRID_SIZE is 9
+                // Disable a number button only when all 9 of that number are placed
+                val isEnabled = count > 0
                 NumberButton(
                     number = number,
                     count = count,
                     isEnabled = isEnabled,
                     onClick = { if (isEnabled) onNumberSelected(number) },
-                    modifier = Modifier.weight(1f) // Each button takes equal space
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
-        // Erase button at the end
         EraseButton(
             onClick = onEraseSelected,
-            modifier = Modifier.width(80.dp) // Adjusted width for erase button
+            modifier = Modifier.width(80.dp)
         )
     }
 }

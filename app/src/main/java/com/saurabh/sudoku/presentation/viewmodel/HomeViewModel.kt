@@ -10,7 +10,9 @@ import com.saurabh.sudoku.domain.model.Statistics
 import com.saurabh.sudoku.domain.repository.GameRepository
 import com.saurabh.sudoku.domain.repository.StatisticsRepository
 import com.saurabh.sudoku.presentation.uistate.HomeUiState
+import com.saurabh.sudoku.presentation.utils.Constants
 import com.saurabh.sudoku.presentation.utils.DateUtils
+import com.saurabh.sudoku.presentation.utils.deepCopy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -27,6 +29,12 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     val currentGame: StateFlow<Game?> = gameRepository.getCurrentGameFlow()
+        .onEach { game ->
+            android.util.Log.d("HomeViewModel",
+                if (game == null) "currentGame → null (no Continue button will show)"
+                else "currentGame → id=${game.id.take(8)}, state=${game.state}, difficulty=${game.difficulty}"
+            )
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -51,9 +59,9 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isGeneratingPuzzle = true) }
 
             try {
-                // Logic from GeneratePuzzleUseCase
                 val board = sudokuGenerator.generatePuzzle(difficulty)
                 val currentTime = DateUtils.getCurrentTimestamp()
+                val maxMistakes = Constants.getMaxMistakes(difficulty.name)
                 val game = Game(
                     id = UUID.randomUUID().toString(),
                     board = board,
@@ -63,10 +71,11 @@ class HomeViewModel @Inject constructor(
                     state = GameState.PLAYING,
                     hintsUsed = 0,
                     createdAt = currentTime,
-                    initialBoard = board.copy()
+                    initialBoard = board.deepCopy(),
+                    mistakes = 0,
+                    maxMistakes = maxMistakes
                 )
                 gameRepository.saveGame(game)
-                // ---
 
                 _uiState.update {
                     it.copy(

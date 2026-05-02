@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
-    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("plugin.serialization") version "2.3.10"
+//    id("kotlin-parcelize")
 }
 
 android {
@@ -33,9 +34,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
     }
     buildFeatures {
         compose = true
@@ -88,4 +86,5 @@ dependencies {
     // Gson for JSON serialization
     implementation(libs.gson)
 
+//    implementation("org.jetbrains.kotlinx:kotlinx-parcelize-runtime:1.7.3")
 }

@@ -1,23 +1,21 @@
 package com.saurabh.sudoku.presentation.ui.components
 
-
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Redo
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Undo
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +27,10 @@ fun GameToolbar(
     elapsedTime: Long,
     hintsRemaining: Int,
     isPaused: Boolean,
+    mistakes: Int,
+    maxMistakes: Int,
+    isNotesMode: Boolean,
+    onNotesModeToggle: () -> Unit,
     onPauseClick: () -> Unit,
     onHintClick: () -> Unit,
     onUndoClick: () -> Unit,
@@ -36,52 +38,94 @@ fun GameToolbar(
     onResetClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val notesBgColor by animateColorAsState(
+        targetValue = if (isNotesMode)
+            MaterialTheme.colorScheme.primaryContainer
+        else
+            MaterialTheme.colorScheme.surface,
+        animationSpec = tween(200),
+        label = "notesBg"
+    )
+    val notesIconColor by animateColorAsState(
+        targetValue = if (isNotesMode)
+            MaterialTheme.colorScheme.onPrimaryContainer
+        else
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+        animationSpec = tween(200),
+        label = "notesIcon"
+    )
+
+    Column(
         modifier = modifier
             .testTag("game_toolbar")
             .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        // Timer
-        Text(
-            text = elapsedTime.formatTime(),
-            style = SudokuTimerTextStyle,
-            fontWeight = FontWeight.Medium
-        )
+        // ── Row 1: Timer | Mistakes | Notes toggle ────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Timer
+            Text(
+                text = elapsedTime.formatTime(),
+                style = SudokuTimerTextStyle,
+                fontWeight = FontWeight.SemiBold
+            )
 
-        // Action buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Mistakes pill
+            MistakeCounter(currentMistakes = mistakes, maxMistakes = maxMistakes)
+
+            // Notes mode toggle pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(notesBgColor)
+                    .padding(0.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(onClick = onNotesModeToggle) {
+                    Icon(
+                        imageVector = if (isNotesMode) Icons.Default.EditNote else Icons.Outlined.EditNote,
+                        contentDescription = if (isNotesMode) "Switch to Number mode" else "Switch to Notes mode",
+                        tint = notesIconColor
+                    )
+                }
+            }
+        }
+
+        // ── Row 2: Action buttons ─────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             ToolbarButton(
                 icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                 onClick = onPauseClick,
-                contentDescription = if (isPaused) "Resume" else "Pause"
+                contentDescription = if (isPaused) "Resume game" else "Pause game"
             )
-
             ToolbarButton(
                 icon = Icons.Default.Lightbulb,
                 onClick = onHintClick,
                 enabled = hintsRemaining > 0,
-                contentDescription = "Hint ($hintsRemaining remaining)"
+                contentDescription = "Hint ($hintsRemaining left)"
             )
-
             ToolbarButton(
                 icon = Icons.AutoMirrored.Filled.Undo,
                 onClick = onUndoClick,
-                contentDescription = "Undo"
+                contentDescription = "Undo last move"
             )
-
             ToolbarButton(
                 icon = Icons.AutoMirrored.Filled.Redo,
                 onClick = onRedoClick,
-                contentDescription = "Redo"
+                contentDescription = "Redo move"
             )
-
             ToolbarButton(
                 icon = Icons.Default.Refresh,
                 onClick = onResetClick,
-                contentDescription = "New Game"
+                contentDescription = "Reset board"
             )
         }
     }

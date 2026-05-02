@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface GameDao {
 
-    @Query("SELECT * FROM games WHERE state != 'COMPLETED' ORDER BY currentTime DESC LIMIT 1")
+    @Query("SELECT * FROM games WHERE state IN ('PLAYING', 'PAUSED') ORDER BY createdAt DESC LIMIT 1")
     suspend fun getCurrentGame(): GameEntity?
 
-    @Query("SELECT * FROM games WHERE state != 'COMPLETED' ORDER BY currentTime DESC LIMIT 1")
+    @Query("SELECT * FROM games WHERE state IN ('PLAYING', 'PAUSED') ORDER BY createdAt DESC LIMIT 1")
     fun getCurrentGameFlow(): Flow<GameEntity?>
 
     @Query("SELECT * FROM games WHERE id = :gameId")

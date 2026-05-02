@@ -17,6 +17,7 @@ class PreferencesRepositoryImpl @Inject constructor(
     override val vibrationEnabled: Flow<Boolean> = preferencesDataStore.vibrationEnabled
     override val highlightErrors: Flow<Boolean> = preferencesDataStore.highlightErrors
     override val autoSave: Flow<Boolean> = preferencesDataStore.autoSave
+    override val notesModeEnabled: Flow<Boolean> = preferencesDataStore.notesModeEnabled
 
     override suspend fun updateThemeMode(mode: String) {
         preferencesDataStore.updateThemeMode(mode)
@@ -44,5 +45,8 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun updateAutoSave(enabled: Boolean) {
         preferencesDataStore.updateAutoSave(enabled)
+    }
+    override suspend fun updateNotesModeEnabled(enabled: Boolean) {
+        preferencesDataStore.updateNotesModeEnabled(enabled)
     }
 }

@@ -15,6 +15,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
 class UserPreferencesDataStore(private val context: Context) {
 
     companion object {
+        val NOTES_MODE_ENABLED = booleanPreferencesKey("notes_mode_enabled")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
         val AUTO_NOTES = booleanPreferencesKey("auto_notes")
@@ -24,6 +25,9 @@ class UserPreferencesDataStore(private val context: Context) {
         val AUTO_SAVE = booleanPreferencesKey("auto_save")
     }
 
+    val notesModeEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[NOTES_MODE_ENABLED] ?: true  // Default enabled
+    }
     val themeMode: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_MODE] ?: "system"
     }
@@ -91,6 +95,11 @@ class UserPreferencesDataStore(private val context: Context) {
     suspend fun updateAutoSave(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AUTO_SAVE] = enabled
+        }
+    }
+    suspend fun updateNotesModeEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTES_MODE_ENABLED] = enabled
         }
     }
 }

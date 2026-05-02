@@ -23,12 +23,56 @@ object GameUtils {
         if (emptyCells.isEmpty()) {
             return null // No empty cells left to give a hint for
         }
-
         // Pick a random empty cell
         val (row, col) = emptyCells.random()
         val solutionValue = solution[row][col]
 
         return Hint(row, col, solutionValue)
+    }
+
+    /**
+     * Return a hint for the specific selected cell.
+     * Returns null if the cell is not empty or no valid solution value found.
+     */
+    fun getHintForCell(currentBoard: Array<IntArray>, solution: Array<IntArray>, row: Int, col: Int): Hint? {
+        if (row !in 0..8 || col !in 0..8) return null
+        if (currentBoard[row][col] != Constants.EMPTY_CELL) return null
+        val solutionValue = solution[row][col]
+        // Always provide hint for empty cell
+        return Hint(row, col, solutionValue)
+    }
+
+    /**
+     * Apply hint value into the board for the selected cell.
+     * Returns true if applied successfully.
+     */
+    fun applyHintToCell(currentBoard: Array<IntArray>, solution: Array<IntArray>, row: Int, col: Int): Boolean {
+        val hint = getHintForCell(currentBoard, solution, row, col) ?: return false
+        currentBoard[row][col] = hint.value
+        return true
+    }
+
+
+    /**
+     * Check if a number can be placed at row,col.
+     * Alias to isValidMove for compatibility with calls like game.board.canPlaceNumber(...)
+     */
+    fun canPlaceNumber(board: Array<IntArray>, row: Int, col: Int, num: Int): Boolean {
+        return isValidMove(board, row, col, num)
+    }
+
+    /**
+     * Helper to decrement a number count in a numberpad representation.
+     * Expects counts size >= 9, index 0 -> number 1.
+     * Returns true when decremented, false if count was already zero or invalid input.
+     */
+    fun decrementNumberPad(counts: IntArray, number: Int): Boolean {
+        if (number !in 1..9) return false
+        val idx = number - 1
+        if (idx >= counts.size) return false
+        if (counts[idx] <= 0) return false
+        counts[idx] = counts[idx] - 1
+        return true
     }
 
 
@@ -107,6 +151,70 @@ object GameUtils {
         }
 
         return true
+    }
+
+    /**
+     * Returns all cells in the same row, column and 3x3 box as (row, col).
+     * Used for highlighting "related" cells when a cell is selected.
+     */
+    fun getRelatedCells(row: Int, col: Int): Set<Pair<Int, Int>> {
+        val related = mutableSetOf<Pair<Int, Int>>()
+        for (i in 0..8) {
+            related.add(row to i)  // same row
+            related.add(i to col)  // same column
+        }
+        val startRow = row - row % 3
+        val startCol = col - col % 3
+        for (r in startRow until startRow + 3) {
+            for (c in startCol until startCol + 3) {
+                related.add(r to c)
+            }
+        }
+        related.remove(row to col) // exclude the selected cell itself
+        return related
+    }
+
+    /**
+     * Returns all cells (other than the selected cell) that hold the same non-zero value.
+     */
+    fun getSameNumberCells(board: Array<IntArray>, row: Int, col: Int): Set<Pair<Int, Int>> {
+        val value = board[row][col]
+        if (value == 0) return emptySet()
+        val result = mutableSetOf<Pair<Int, Int>>()
+        for (r in board.indices) {
+            for (c in board[r].indices) {
+                if ((r != row || c != col) && board[r][c] == value) {
+                    result.add(r to c)
+                }
+            }
+        }
+        return result
+    }
+
+    /**
+     * Computes all conflict cells using TWO strategies combined:
+     * 1. Cells whose value does not match the solution (wrong answer).
+     * 2. Cells that duplicate the same number in their row/col/box (logical conflict).
+     * This catches mistakes even when the solution isn't considered.
+     */
+    fun computeAllConflicts(board: Array<IntArray>, solution: Array<IntArray>): Set<Pair<Int, Int>> {
+        val conflicts = mutableSetOf<Pair<Int, Int>>()
+        for (r in board.indices) {
+            for (c in board[r].indices) {
+                val v = board[r][c]
+                if (v == 0) continue
+                // Strategy 1: wrong vs solution
+                if (solution[r][c] != v) {
+                    conflicts.add(r to c)
+                    continue
+                }
+                // Strategy 2: duplicate in row/col/box (catches board-level conflicts)
+                if (getCellConflicts(board, r, c).isNotEmpty()) {
+                    conflicts.add(r to c)
+                }
+            }
+        }
+        return conflicts
     }
 
     fun getCellConflicts(board: Array<IntArray>, row: Int, col: Int): Set<Pair<Int, Int>> {

@@ -10,6 +10,7 @@ interface PreferencesRepository {
     val vibrationEnabled: Flow<Boolean>
     val highlightErrors: Flow<Boolean>
     val autoSave: Flow<Boolean>
+    val notesModeEnabled: Flow<Boolean>
 
     suspend fun updateThemeMode(mode: String)
     suspend fun updateSoundEnabled(enabled: Boolean)
@@ -18,4 +19,5 @@ interface PreferencesRepository {
     suspend fun updateVibrationEnabled(enabled: Boolean)
     suspend fun updateHighlightErrors(enabled: Boolean)
     suspend fun updateAutoSave(enabled: Boolean)
+    suspend fun updateNotesModeEnabled(enabled: Boolean)
 }

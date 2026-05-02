@@ -7,6 +7,7 @@ import com.saurabh.sudoku.data.local.database.entities.GameEntity
 import com.saurabh.sudoku.domain.model.Difficulty
 import com.saurabh.sudoku.domain.model.Game
 import com.saurabh.sudoku.domain.model.GameState
+import com.saurabh.sudoku.domain.model.Notes
 import com.saurabh.sudoku.domain.model.SudokuBoard
 import com.saurabh.sudoku.domain.repository.GameRepository
 import com.saurabh.sudoku.presentation.utils.DateUtils
@@ -25,7 +26,14 @@ class GameRepositoryImpl @Inject constructor(
     }
 
     override fun getCurrentGameFlow(): Flow<Game?> {
-        return gameDao.getCurrentGameFlow().map { it?.toDomainModel() }
+        return gameDao.getCurrentGameFlow().map { entity ->
+            val game = entity?.toDomainModel()
+            android.util.Log.d("GameRepository",
+                if (game == null) "getCurrentGameFlow → null (no active game)"
+                else "getCurrentGameFlow → id=${game.id.take(8)}, state=${game.state}, difficulty=${game.difficulty}, createdAt=${game.createdAt}"
+            )
+            game
+        }
     }
 
     override suspend fun getGameById(gameId: String): Game? {
@@ -67,13 +75,13 @@ class GameRepositoryImpl @Inject constructor(
 
     private fun GameEntity.toDomainModel(): Game {
         val boardType = object : TypeToken<Array<IntArray>>() {}.type
+        val notesType = object : TypeToken<Notes>() {}.type
 
         return Game(
             id = id,
             board = SudokuBoard(
                 board = gson.fromJson(board, boardType),
                 solution = gson.fromJson(solution, boardType),
-                // FIX: Add the missing initialBoard parameter here
                 initialBoard = gson.fromJson(initialBoard, boardType)
             ),
             initialBoard = SudokuBoard(
@@ -88,6 +96,9 @@ class GameRepositoryImpl @Inject constructor(
             hintsUsed = hintsUsed,
             createdAt = createdAt,
             completedAt = completedAt,
+            mistakes = mistakes,
+            maxMistakes = maxMistakes,
+            notes = gson.fromJson(notes, notesType) ?: Notes()
 
         )
     }
@@ -104,7 +115,10 @@ class GameRepositoryImpl @Inject constructor(
             state = state.name,
             hintsUsed = hintsUsed,
             createdAt = createdAt,
-            completedAt = completedAt
+            completedAt = completedAt,
+            mistakes = mistakes,
+            maxMistakes = maxMistakes,
+            notes = gson.toJson(notes)
         )
     }
 }

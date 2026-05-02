@@ -45,6 +45,7 @@ fun SettingsScreen(
     val vibrationEnabled by viewModel.vibrationEnabled.collectAsStateWithLifecycle()
     val highlightErrors by viewModel.highlightErrors.collectAsStateWithLifecycle()
     val autoSave by viewModel.autoSave.collectAsStateWithLifecycle()
+    val notesModeEnabled by viewModel.notesModeEnabled.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier
@@ -85,6 +86,12 @@ fun SettingsScreen(
 
             // Gameplay Settings
             SettingsSection(title = "Gameplay") {
+                SettingsSwitch(
+                    title = "Notes Mode",
+                    subtitle = "Tap numbers to add/remove pencil marks in empty cells",
+                    checked = notesModeEnabled,
+                    onCheckedChange = viewModel::setNotesModeEnabled
+                )
                 SettingsSwitch(
                     title = "Auto Notes",
                     subtitle = "Automatically add/remove notes when placing numbers",

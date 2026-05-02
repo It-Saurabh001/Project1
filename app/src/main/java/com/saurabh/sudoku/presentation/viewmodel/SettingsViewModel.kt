@@ -14,75 +14,62 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val hapticFeedbackManager: HapticFeedbackManager
-) : ViewModel(){
+) : ViewModel() {
 
     val themeMode = preferencesRepository.themeMode
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = "system"
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
 
     val soundEnabled = preferencesRepository.soundEnabled
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val autoNotes = preferencesRepository.autoNotes
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = false
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val showHints = preferencesRepository.showHints
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val vibrationEnabled = preferencesRepository.vibrationEnabled
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val highlightErrors = preferencesRepository.highlightErrors
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val autoSave = preferencesRepository.autoSave
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val notesModeEnabled = preferencesRepository.notesModeEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     fun setThemeMode(mode: String) = viewModelScope.launch {
         preferencesRepository.updateThemeMode(mode)
     }
-    fun setSoundEnabled(enabled : Boolean) = viewModelScope.launch { preferencesRepository.updateSoundEnabled(enabled) }
 
-    fun setAutoNotes(enabled: Boolean) = viewModelScope.launch { preferencesRepository.updateAutoNotes(enabled) }
-
-    fun setShowHints(enabled: Boolean) = viewModelScope.launch { preferencesRepository.updateShowHints(enabled) }
-
-    fun setVibrationEnabled(enabled: Boolean) = viewModelScope.launch{
-        preferencesRepository.updateVibrationEnabled(enabled)
-        if(enabled){
-            hapticFeedbackManager.performVibration()  // vibration on action enabled in settings
-        }
+    fun setSoundEnabled(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateSoundEnabled(enabled)
     }
 
-    fun setHighlightErrors(enabled: Boolean) =  viewModelScope.launch { preferencesRepository.updateHighlightErrors(enabled) }
+    fun setAutoNotes(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateAutoNotes(enabled)
+    }
 
-    fun setAutoSave(enabled: Boolean)= viewModelScope.launch { preferencesRepository.updateAutoSave(enabled) }
+    fun setShowHints(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateShowHints(enabled)
+    }
 
+    fun setVibrationEnabled(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateVibrationEnabled(enabled)
+        if (enabled) hapticFeedbackManager.performVibration()
+    }
+
+    fun setHighlightErrors(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateHighlightErrors(enabled)
+    }
+
+    fun setAutoSave(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateAutoSave(enabled)
+    }
+
+    fun setNotesModeEnabled(enabled: Boolean) = viewModelScope.launch {
+        preferencesRepository.updateNotesModeEnabled(enabled)
+    }
 }

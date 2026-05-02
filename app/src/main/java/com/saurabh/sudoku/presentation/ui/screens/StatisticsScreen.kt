@@ -5,9 +5,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -42,6 +42,11 @@ fun StatisticsScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.refreshStatistics() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -49,33 +54,26 @@ fun StatisticsScreen(
             )
         }
     ) { innerPadding ->
-        statistics?.let { stats ->
-            Column(
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Overall Stats
-                OverallStatsCard(statistics = stats)
-
-                // Best Times
-                BestTimesCard(statistics = stats)
-
-                // Achievement Stats
-                AchievementStatsCard(statistics = stats)
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        } ?: Box(
+        // Sirf statistics show karo - chahe 0 ho ya kuch bhi
+        // Koi "Play a Game" button nahi dikhana
+        Column(
             modifier = Modifier
+                .padding(innerPadding)
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CircularProgressIndicator()
+            // Overall Stats - 0 dikhega agar koi game nahi khela
+            OverallStatsCard(statistics = statistics)
+
+            // Best Times - "--:--" dikhega agar koi best time nahi hai
+            BestTimesCard(statistics = statistics)
+
+            // Achievement Stats - 0 dikhega agar koi streak nahi hai
+            AchievementStatsCard(statistics = statistics)
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

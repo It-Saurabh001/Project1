@@ -15,5 +15,8 @@ data class GameEntity(
     val state: String,
     val hintsUsed: Int,
     val createdAt: Long,
-    val completedAt: Long?
+    val completedAt: Long?,
+    val mistakes: Int = 0,
+    val maxMistakes: Int = 3,
+    val notes: String = "{}"
 )

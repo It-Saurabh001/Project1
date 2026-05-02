@@ -1,9 +1,4 @@
 package com.saurabh.sudoku.presentation.viewmodel
 
-import androidx.lifecycle.ViewModel
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
-
-//@HiltViewModel
-class MyViewModel @Inject constructor() : ViewModel(){
-}
+// This file is intentionally unused and kept as a placeholder.
+// No ViewModel functionality is defined here.

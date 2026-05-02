@@ -7,8 +7,21 @@ object DateUtils {
 
     fun getCurrentTimestamp(): Long = System.currentTimeMillis()
 
-    fun formatTimestamp(timestamp: Long): String {
-        return dateFormat.format(Date(timestamp))
+    fun Long.formatTime(): String {
+        if (this <= 0) return "--:--"
+
+        val seconds = this / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+
+        return when {
+            hours > 0 -> String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
+            else -> String.format("%02d:%02d", minutes, seconds % 60)
+        }
+    }
+
+    fun getCurrentDate(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
     fun getDaysSince(timestamp: Long): Int {
