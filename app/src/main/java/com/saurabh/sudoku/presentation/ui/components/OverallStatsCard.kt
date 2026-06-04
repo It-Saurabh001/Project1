@@ -20,11 +20,15 @@ fun OverallStatsCard(
 ) {
     Log.d(TAG, "🎴 OverallStatsCard rendering")
     Log.d(TAG, "   - gamesCompleted: ${statistics.gamesCompleted}")
+    Log.d(TAG, "   - totalGamesPlayed: ${statistics.totalGamesPlayed}")
+    Log.d(TAG, "   - gamesLost: ${statistics.gamesLost}")
     Log.d(TAG, "   - totalPlayTime: ${statistics.totalPlayTime}")
     Log.d(TAG, "   - totalHintsUsed: ${statistics.totalHintsUsed}")
 
     val avgTime = statistics.getAverageTime()
+    val winRate = statistics.getWinRatePercent()
     Log.d(TAG, "   - averageTime: $avgTime")
+    Log.d(TAG, "   - winRate: $winRate%")
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -44,15 +48,56 @@ fun OverallStatsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                val gamesValue = statistics.gamesCompleted.toString()
-                Log.d(TAG, "   - Games Completed value: $gamesValue")
+                val totalGamesValue = statistics.totalGamesPlayed.toString()
+                Log.d(TAG, "   - Total Games Played value: $totalGamesValue")
 
                 StatCard(
-                    title = "Games Completed",
-                    value = gamesValue,
+                    title = "Total Games Played",
+                    value = totalGamesValue,
                     modifier = Modifier.weight(1f)
                 )
 
+                val gamesWonValue = statistics.gamesCompleted.toString()
+                Log.d(TAG, "   - Games Won value: $gamesWonValue")
+
+                StatCard(
+                    title = "Games Won",
+                    value = gamesWonValue,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val gamesLostValue = statistics.gamesLost.toString()
+                Log.d(TAG, "   - Games Lost value: $gamesLostValue")
+
+                StatCard(
+                    title = "Games Lost",
+                    value = gamesLostValue,
+                    modifier = Modifier.weight(1f)
+                )
+
+                val winRateValue = "${winRate}%"
+                Log.d(TAG, "   - Win Rate value: $winRateValue")
+
+                StatCard(
+                    title = "Win Rate",
+                    value = winRateValue,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 val totalTimeValue = if (statistics.totalPlayTime > 0)
                     statistics.totalPlayTime.formatTime()
                 else
@@ -64,14 +109,7 @@ fun OverallStatsCard(
                     value = totalTimeValue,
                     modifier = Modifier.weight(1f)
                 )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
                 val avgTimeValue = if (avgTime > 0)
                     avgTime.formatTime()
                 else
@@ -83,7 +121,14 @@ fun OverallStatsCard(
                     value = avgTimeValue,
                     modifier = Modifier.weight(1f)
                 )
+            }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 val hintsValue = statistics.totalHintsUsed.toString()
                 Log.d(TAG, "   - Hints Used value: $hintsValue")
 
@@ -93,43 +138,6 @@ fun OverallStatsCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun StatCard1(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Log.d(TAG, "   📇 StatCard - $title: $value")
-
-    Card(
-        modifier = modifier.padding(4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

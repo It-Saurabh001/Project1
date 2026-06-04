@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -34,6 +35,8 @@ fun GameScreen(
     gameViewModel: GameViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val TAG = "GameScreen"
+    Log.d(TAG, "GameScreen composable called with gameId: $gameId")
     val context = LocalContext.current
     val uiState by gameViewModel.uiState.collectAsStateWithLifecycle()
     val highlightErrors by settingsViewModel.highlightErrors.collectAsStateWithLifecycle()
@@ -53,6 +56,7 @@ fun GameScreen(
     // Hint / error messages
     LaunchedEffect(uiState.hintMessage) {
         uiState.hintMessage?.let { msg ->
+            Log.d(TAG, "Showing hint/error toast: $msg")
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             gameViewModel.dismissHint()
         }
@@ -61,6 +65,7 @@ fun GameScreen(
     // Mistake toast
     LaunchedEffect(uiState.showMistakeToast, uiState.mistakeMessage) {
         if (uiState.showMistakeToast && uiState.mistakeMessage != null) {
+            Log.d(TAG, "Showing mistake toast: ${uiState.mistakeMessage}")
             Toast.makeText(context, uiState.mistakeMessage, Toast.LENGTH_SHORT).show()
             gameViewModel.dismissMistakeToast()
         }
@@ -107,6 +112,7 @@ fun GameScreen(
 
     // Completion dialog
     if (uiState.showCompletionDialog && uiState.completionTime != null) {
+        Log.d(TAG, "Showing completion dialog for game ${game.id.take(8)}, time: ${uiState.completionTime}, hints: ${game.hintsUsed}")
         GameCompletedDialog(
             difficulty = game.difficulty,
             completionTime = uiState.completionTime!!,
@@ -167,6 +173,7 @@ fun GameScreen(
 
             // Game Over inline dialog
             if (uiState.showGameOverDialog) {
+                Log.d(TAG, "Showing game over dialog for game ${game.id.take(8)}, mistakes: ${game.mistakes}/${game.maxMistakes}")
                 GameOverDialog(
                     difficulty  = game.difficulty,
                     mistakes    = game.mistakes,

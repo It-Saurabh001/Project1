@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.domain.usecase
 
+import android.util.Log
 import com.saurabh.sudoku.domain.model.Game
 import com.saurabh.sudoku.presentation.utils.Constants
 import javax.inject.Inject
@@ -7,7 +8,10 @@ import kotlin.random.Random
 
 class GetHintUseCase @Inject constructor() {
     operator fun invoke(game: Game): HintResult {
+        val TAG = "GetHintUseCase"
+        Log.d(TAG, "invoke() gameId=${game.id.take(8)}, hintsUsed=${game.hintsUsed}/${Constants.MAX_HINTS}")
         if (game.hintsUsed >= Constants.MAX_HINTS) {
+            Log.d(TAG, "No more hints available")
             return HintResult(null, "No more hints available")
         }
 
@@ -22,14 +26,17 @@ class GetHintUseCase @Inject constructor() {
                 }
             }
         }
+        Log.d(TAG, "Found ${emptyCells.size} empty cells")
 
         if (emptyCells.isEmpty()) {
+            Log.d(TAG, "No empty cells")
             return HintResult(null, "No empty cells")
         }
 
         // Choose a random empty cell
         val (row, col) = emptyCells[Random.nextInt(emptyCells.size)]
         val hintValue = board.getSolutionValue(row, col)
+        Log.d(TAG, "Selected hint: ($row, $col) = $hintValue")
 
         return HintResult(
             hint = Hint(row, col, hintValue),

@@ -38,6 +38,8 @@ class StatisticsViewModel @Inject constructor(
             Log.d(TAG, "   longestStreak  = ${stats.longestStreak}")
             Log.d(TAG, "   totalHintsUsed = ${stats.totalHintsUsed}")
             Log.d(TAG, "   lastPlayedDate = ${stats.lastPlayedDate}")
+            Log.d(TAG, "   totalGamesPlayed = ${stats.totalGamesPlayed}")
+            Log.d(TAG, "   gamesLost = ${stats.gamesLost}")
         }
         .stateIn(
             scope = viewModelScope,
@@ -50,6 +52,7 @@ class StatisticsViewModel @Inject constructor(
         viewModelScope.launch {
             val stats = statisticsRepository.getStatistics()
             Log.d(TAG, "refreshStatistics() → gamesCompleted=${stats.gamesCompleted}, " +
+                "totalGamesPlayed=${stats.totalGamesPlayed}, gamesLost=${stats.gamesLost}, " +
                 "streak=${stats.currentStreak}/${stats.longestStreak}")
         }
     }

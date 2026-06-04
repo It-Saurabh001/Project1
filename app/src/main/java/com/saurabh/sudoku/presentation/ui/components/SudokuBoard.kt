@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -26,6 +27,8 @@ fun SudokuBoard(
     onCellClick: (row: Int, col: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val TAG = "SudokuBoard"
+    Log.d(TAG, "SudokuBoard composed with selectedCell: $selectedCell, highlightedCells: ${highlightedCells.size}, sameNumberCells: ${sameNumberCells.size}, conflictCells: ${conflictCells.size}")
     Column(
         modifier = modifier
             .testTag("sudoku_board")

@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.domain.usecase
 
+import android.util.Log
 import com.saurabh.sudoku.domain.model.SudokuBoard
 import com.saurabh.sudoku.presentation.utils.GameUtils
 import javax.inject.Inject
@@ -27,8 +28,11 @@ class ValidateMoveUseCase @Inject constructor() {
         currentMistakes: Int,
         maxMistakes: Int
     ): ValidationResult {
+        val TAG = "ValidateMoveUseCase"
+        Log.d(TAG, "invoke() row=$row, col=$col, number=$number, currentMistakes=$currentMistakes, maxMistakes=$maxMistakes")
         // Erasing is always valid — never a mistake
         if (number == 0) {
+            Log.d(TAG, "Erasing cell ($row, $col)")
             return ValidationResult(
                 isValid = true,
                 canPlaceNumber = true,
@@ -40,6 +44,7 @@ class ValidateMoveUseCase @Inject constructor() {
 
         // Cannot change initial (clue) cells
         if (board.isInitialCell(row, col)) {
+            Log.d(TAG, "Attempt to change initial cell at ($row, $col)")
             return ValidationResult(
                 isValid = false,
                 canPlaceNumber = false,
@@ -52,11 +57,13 @@ class ValidateMoveUseCase @Inject constructor() {
         // Check against the solution — this is the correct mistake definition
         val correctAnswer = board.solution[row][col]
         val isCorrect = (number == correctAnswer)
+        Log.d(TAG, "Placing $number at ($row, $col), correct is $correctAnswer, isCorrect=$isCorrect")
 
         if (!isCorrect) {
             val newMistakes = currentMistakes + 1
             val isGameOver = newMistakes >= maxMistakes
             val remaining = maxMistakes - newMistakes
+            Log.d(TAG, "Wrong move! newMistakes=$newMistakes, isGameOver=$isGameOver")
 
             return ValidationResult(
                 isValid = false,
@@ -71,6 +78,7 @@ class ValidateMoveUseCase @Inject constructor() {
         }
 
         // Correct placement
+        Log.d(TAG, "Correct move!")
         return ValidationResult(
             isValid = true,
             canPlaceNumber = true,

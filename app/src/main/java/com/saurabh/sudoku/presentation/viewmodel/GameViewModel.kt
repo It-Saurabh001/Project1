@@ -103,15 +103,18 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun loadGame(gameId: String) {
+        Log.d(TAG, "loadGame() called with gameId: $gameId")
         dismissHint()
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             try {
                 val game = gameRepository.getGameById(gameId)
                 if (game != null) {
+                    Log.d(TAG, "loadGame() successfully loaded game: ${game.id.take(8)}, difficulty: ${game.difficulty}, state: ${game.state}")
                     val conflicts = recomputeConflicts(game.board.board, game.board.solution)
                     // Auto-resume paused games
                     val loadedGame = if (game.state == GameState.PAUSED) {
+                        Log.d(TAG, "loadGame() auto-resuming paused game")
                         game.copy(state = GameState.PLAYING)
                     } else game
                     currentGame = loadedGame
@@ -133,11 +136,16 @@ class GameViewModel @Inject constructor(
                             maxMistakes = loadedGame.maxMistakes
                         )
                     }
-                    if (loadedGame.state == GameState.PLAYING) startTimer()
+                    if (loadedGame.state == GameState.PLAYING) {
+                        Log.d(TAG, "loadGame() starting timer")
+                        startTimer()
+                    }
                 } else {
+                    Log.e(TAG, "loadGame() failed: gameId $gameId not found in repository")
                     _uiState.update { it.copy(isLoading = false, error = "Game not found") }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadGame() exception: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false, error = "Failed to load: ${e.message}") }
             }
         }
@@ -148,17 +156,23 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onCellSelected(row: Int, col: Int) {
+        Log.d(TAG, "onCellSelected() row: $row, col: $col")
         val state = _uiState.value
         val game = state.game ?: return
         soundManager.playClick()
 
-        val newSelected = if (state.selectedCell == (row to col)) null else (row to col)
+        val newSelected = if (state.selectedCell == (row to col)) {
+            Log.d(TAG, "onCellSelected() deselecting cell")
+            null
+        } else (row to col)
+        
         if (newSelected == null) {
             _uiState.update {
                 it.copy(selectedCell = null, highlightedCells = emptySet(), sameNumberCells = emptySet())
             }
         } else {
             val (related, sameNum) = computeHighlights(game.board.board, row, col)
+            Log.d(TAG, "onCellSelected() highlighting related: ${related.size} cells, sameNumber: ${sameNum.size} cells")
             _uiState.update {
                 it.copy(
                     selectedCell = newSelected,
@@ -174,8 +188,10 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onNumberSelected(number: Int) {
+        Log.d(TAG, "onNumberSelected() number: $number")
         val state = _uiState.value
         val selected = state.selectedCell ?: run {
+            Log.w(TAG, "onNumberSelected() no cell selected")
             showToast("Select a cell first")
             return
         }
@@ -183,6 +199,7 @@ class GameViewModel @Inject constructor(
         val (row, col) = selected
 
         if (game.board.isInitialCell(row, col)) {
+            Log.d(TAG, "onNumberSelected() attempt to modify clue cell at ($row, $col)")
             showToast("Cannot modify a clue cell")
             return
         }
@@ -191,6 +208,7 @@ class GameViewModel @Inject constructor(
 
         // ---- NOTES MODE ----
         if (state.isNotesMode && currentValue == 0) {
+            Log.d(TAG, "onNumberSelected() notes mode: toggling note $number at ($row, $col)")
             val notesBefore = game.notes.copy()
             val newNotes = game.notes.copy()
             if (newNotes.getNotes(row, col).contains(number)) {
@@ -212,7 +230,11 @@ class GameViewModel @Inject constructor(
 
         // ---- NUMBER MODE ----
         // Ensure game is running
-        if (currentGame?.state != GameState.PLAYING) resumeGame()
+        if (currentGame?.state != GameState.PLAYING) {
+            Log.d(TAG, "onNumberSelected() game not playing, resuming...")
+            resumeGame()
+        }
+        Log.d(TAG, "onNumberSelected() number mode: placing $number at ($row, $col)")
         viewModelScope.launch { makeMove(row, col, number, game.notes.copy()) }
     }
 
@@ -254,13 +276,23 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     private suspend fun makeMove(row: Int, col: Int, number: Int, notesBefore: Notes) {
+        Log.d(TAG, "makeMove() START row: $row, col: $col, number: $number")
         val game = currentGame ?: return
 
-        if (game.state == GameState.LOST || game.state == GameState.COMPLETED) return
-        if (game.board.isInitialCell(row, col)) return
+        if (game.state == GameState.LOST || game.state == GameState.COMPLETED) {
+            Log.w(TAG, "makeMove() ignored: game state is ${game.state}")
+            return
+        }
+        if (game.board.isInitialCell(row, col)) {
+            Log.w(TAG, "makeMove() ignored: initial cell at ($row, $col)")
+            return
+        }
 
         val oldValue = game.board.getCurrentValue(row, col)
-        if (oldValue == number) return // No change
+        if (oldValue == number) {
+            Log.d(TAG, "makeMove() ignored: number $number already at ($row, $col)")
+            return
+        }
 
         // Validate
         val validation = validateMoveUseCase(
@@ -270,11 +302,13 @@ class GameViewModel @Inject constructor(
             currentMistakes = game.mistakes,
             maxMistakes = game.maxMistakes
         )
+        Log.d(TAG, "makeMove() validation result: isValid=${validation.isValid}, canPlace=${validation.canPlaceNumber}, mistakes=${validation.newMistakes}/${game.maxMistakes}")
 
         var updatedGame = game
 
         // Apply mistake count change
         if (validation.newMistakes != game.mistakes) {
+            Log.d(TAG, "makeMove() mistake made! New mistake count: ${validation.newMistakes}")
             updatedGame = game.copy(mistakes = validation.newMistakes)
             currentGame = updatedGame
             soundManager.playMistake()
@@ -290,12 +324,17 @@ class GameViewModel @Inject constructor(
 
         // Game over
         if (validation.isGameOver) {
+            Log.d(TAG, "makeMove() GAME OVER (mistakes limit reached)")
             val lostGame = updatedGame.copy(
                 state = GameState.LOST,
                 currentTime = DateUtils.getCurrentTimestamp()
             )
             currentGame = lostGame
             gameRepository.updateGame(lostGame)
+            // Record the loss in statistics
+            viewModelScope.launch {
+                statisticsRepository.recordGameLost(updatedGame.elapsedTime, updatedGame.hintsUsed)
+            }
             _uiState.update { it.copy(game = lostGame, showGameOverDialog = true) }
             stopTimer()
             return
@@ -303,23 +342,28 @@ class GameViewModel @Inject constructor(
 
         // Place number on board
         if (validation.canPlaceNumber) {
+            Log.d(TAG, "makeMove() placing number $number on board")
             val newBoard = updatedGame.board.board.map { it.clone() }.toTypedArray()
             newBoard[row][col] = number
 
             // Auto-remove notes in same row/col/box when placing a correct number
             val notesAfter = notesBefore.copy()
             if (number != 0 && validation.isValid) {
+                Log.d(TAG, "makeMove() auto-removing notes for $number")
                 notesAfter.autoRemoveNotes(row, col, number, newBoard)
             } else if (number != 0) {
+                Log.d(TAG, "makeMove() clearing notes at ($row, $col)")
                 notesAfter.clearNotes(row, col) // Also clear notes at this cell
             }
 
             // Push to undo/redo history
             if (moveIndex < moveHistory.size - 1) {
+                Log.d(TAG, "makeMove() clearing forward history for redo")
                 moveHistory.subList(moveIndex + 1, moveHistory.size).clear()
             }
             moveHistory.add(Move(row, col, oldValue, number, notesBefore, notesAfter))
             moveIndex++
+            Log.d(TAG, "makeMove() move added to history. Index: $moveIndex, Size: ${moveHistory.size}")
 
             val updatedBoard = updatedGame.board.copy(board = newBoard)
             val finalGame = updatedGame.copy(
@@ -349,6 +393,7 @@ class GameViewModel @Inject constructor(
             }
 
             if (validation.isValid && number != 0) {
+                Log.d(TAG, "makeMove() correct move! Checking for completion...")
                 soundManager.playCorrect()
                 checkGameCompletion(finalGame)
             }
@@ -415,23 +460,29 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onUndoMove() {
+        Log.d(TAG, "onUndoMove() moveIndex=$moveIndex")
         if (moveIndex < 0) {
+            Log.d(TAG, "onUndoMove() nothing to undo")
             showToast("Nothing to undo")
             return
         }
         val move = moveHistory[moveIndex]
+        Log.d(TAG, "onUndoMove() undoing move at (${move.row}, ${move.col}) from ${move.newValue} back to ${move.oldValue}")
         moveIndex--
         applyBoardChange(move.row, move.col, move.oldValue, move.notesBefore)
         soundManager.playClick()
     }
 
     fun onRedoMove() {
+        Log.d(TAG, "onRedoMove() moveIndex=$moveIndex, historySize=${moveHistory.size}")
         if (moveIndex >= moveHistory.size - 1) {
+            Log.d(TAG, "onRedoMove() nothing to redo")
             showToast("Nothing to redo")
             return
         }
         moveIndex++
         val move = moveHistory[moveIndex]
+        Log.d(TAG, "onRedoMove() redoing move at (${move.row}, ${move.col}) from ${move.oldValue} to ${move.newValue}")
         applyBoardChange(move.row, move.col, move.newValue, move.notesAfter)
         soundManager.playClick()
     }
@@ -471,12 +522,15 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onNewGame() {
+        Log.d(TAG, "onNewGame() requested")
         dismissHint()
         val currentDifficulty = currentGame?.difficulty ?: Difficulty.MEDIUM
+        Log.d(TAG, "onNewGame() starting generation for difficulty: $currentDifficulty")
         viewModelScope.launch {
             _uiState.update { it.copy(isGeneratingNewGame = true) }
             try {
                 val board = sudokuGenerator.generatePuzzle(currentDifficulty)
+                Log.d(TAG, "onNewGame() puzzle generated successfully")
                 val currentTime = DateUtils.getCurrentTimestamp()
                 val maxMistakes = Constants.getMaxMistakes(currentDifficulty.name)
                 val newGame = Game(
@@ -495,6 +549,7 @@ class GameViewModel @Inject constructor(
                     notes = Notes()
                 )
                 gameRepository.saveGame(newGame)
+                Log.d(TAG, "onNewGame() new game saved: ${newGame.id.take(8)}")
                 currentGame = newGame
                 moveHistory.clear()
                 moveIndex = -1
@@ -521,6 +576,7 @@ class GameViewModel @Inject constructor(
                 }
                 startTimer()
             } catch (e: Exception) {
+                Log.e(TAG, "onNewGame() failed to generate puzzle: ${e.message}", e)
                 _uiState.update {
                     it.copy(isGeneratingNewGame = false, error = "Failed to generate puzzle: ${e.message}")
                 }
@@ -533,25 +589,31 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onHintRequested() {
+        Log.d(TAG, "onHintRequested() START")
         val game = currentGame ?: return
         if (game.hintsUsed >= Constants.MAX_HINTS) {
+            Log.d(TAG, "onHintRequested() limit reached: ${game.hintsUsed}/${Constants.MAX_HINTS}")
             showToast("No more hints available (${Constants.MAX_HINTS} used)")
             return
         }
         val selected = _uiState.value.selectedCell
         if (selected == null) {
+            Log.d(TAG, "onHintRequested() no cell selected")
             showToast("Tap an empty cell to get a hint")
             return
         }
         val (r, c) = selected
         if (game.board.getCurrentValue(r, c) != 0) {
+            Log.d(TAG, "onHintRequested() cell at ($r, $c) is already filled")
             showToast("Hint only works on empty cells")
             return
         }
         val hint = GameUtils.getHintForCell(game.board.board, game.board.solution, r, c) ?: run {
+            Log.w(TAG, "onHintRequested() no hint available for ($r, $c)")
             showToast("No hint available for this cell")
             return
         }
+        Log.d(TAG, "onHintRequested() hint found: value ${hint.value} for ($r, $c)")
         viewModelScope.launch { applyHintAt(game, r, c, hint.value) }
     }
 
@@ -608,6 +670,7 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onResetBoard() = viewModelScope.launch {
+        Log.d(TAG, "onResetBoard() START")
         val game = _uiState.value.game ?: return@launch
         val freshBoard = game.initialBoard.deepCopy()
         val clearedNotes = Notes()
@@ -622,6 +685,7 @@ class GameViewModel @Inject constructor(
         currentGame = resetGame
         moveHistory.clear()
         moveIndex = -1
+        Log.d(TAG, "onResetBoard() resetting game in repository")
         gameRepository.updateGame(resetGame)
         soundManager.playClick()
         _uiState.update {
@@ -639,7 +703,11 @@ class GameViewModel @Inject constructor(
                 isNotesMode = false
             )
         }
-        if (resetGame.state == GameState.PLAYING) startTimer()
+        if (resetGame.state == GameState.PLAYING) {
+            Log.d(TAG, "onResetBoard() restarting timer")
+            startTimer()
+        }
+        Log.d(TAG, "onResetBoard() END")
     }
 
     // -------------------------------------------------------------------------

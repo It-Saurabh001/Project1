@@ -21,26 +21,15 @@ class StatisticsRepositoryImpl @Inject constructor(
 
     private val TAG = "StatisticsRepo"
 
-    /**
-     * Ensures the statistics singleton row (id=1) exists in the DB.
-     * Uses INSERT OR REPLACE, so it's safe to call multiple times.
-     * Preserves existing data because Room's @Insert(REPLACE) will restore
-     * defaults only if the row truly doesn't exist yet.
-     *
-     * We call this ONCE on every [recordGameCompleted] before the UPDATE.
-     */
-    private suspend fun ensureStatisticsRowExists() {
-        val existing = statisticsDao.getStatistics()
-        if (existing == null) {
-            Log.w(TAG, "⚠️ Statistics row missing — seeding with defaults")
-            statisticsDao.insertStatistics(StatisticsEntity())
-            Log.d(TAG, "✅ Statistics row seeded (id=1)")
-        }
-    }
+    // -------------------------------------------------------------------------
+    // Reads
+    // -------------------------------------------------------------------------
 
     override suspend fun getStatistics(): Statistics {
+        ensureRowExists()
         val entity = statisticsDao.getStatistics()
-        Log.d(TAG, "getStatistics() → ${if (entity == null) "NULL (returning defaults)" else "gamesCompleted=${entity.gamesCompleted}"}")
+        Log.d(TAG, "getStatistics() → ${if (entity == null) "NULL (defaults)" else
+            "played=${entity.totalGamesPlayed}, won=${entity.gamesCompleted}, lost=${entity.gamesLost}"}")
         return entity?.toDomainModel() ?: Statistics()
     }
 
@@ -49,71 +38,85 @@ class StatisticsRepositoryImpl @Inject constructor(
             if (entity == null) {
                 Log.w(TAG, "getStatisticsFlow emitted null — returning default Statistics()")
             } else {
-                Log.d(TAG, "getStatisticsFlow emitted: gamesCompleted=${entity.gamesCompleted}, " +
-                    "bestEasy=${entity.bestTimeEasy}, bestMed=${entity.bestTimeMedium}, " +
-                    "streak=${entity.currentStreak}/${entity.longestStreak}")
+                Log.d(TAG, "getStatisticsFlow: played=${entity.totalGamesPlayed}, " +
+                    "won=${entity.gamesCompleted}, lost=${entity.gamesLost}, " +
+                    "streak=${entity.currentStreak}/${entity.longestStreak}, " +
+                    "bestEasy=${entity.bestTimeEasy}ms")
             }
             entity?.toDomainModel() ?: Statistics()
         }
     }
 
     override suspend fun updateStatistics(statistics: Statistics) {
-        Log.d(TAG, "updateStatistics() called — gamesCompleted=${statistics.gamesCompleted}")
+        Log.d(TAG, "updateStatistics() called manually")
         statisticsDao.updateStatistics(statistics.toEntity())
     }
+
+    // -------------------------------------------------------------------------
+    // Record WIN
+    // -------------------------------------------------------------------------
 
     override suspend fun recordGameCompleted(
         difficulty: Difficulty,
         gameTime: Long,
         hintsUsed: Int
     ) {
-        val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        Log.d(TAG, "📊 recordGameCompleted START — difficulty=$difficulty, gameTime=${gameTime}ms, hints=$hintsUsed, date=$currentDate")
+        val today = todayString()
+        Log.d(TAG, "📊 recordGameCompleted (WIN) — diff=$difficulty, time=${gameTime}ms, hints=$hintsUsed, date=$today")
 
-        // Step 1: Guarantee the row exists
-        ensureStatisticsRowExists()
+        ensureRowExists()
 
-        // Step 2: Atomically update all statistics fields
-        val rowsUpdated = statisticsDao.updateGameCompleted(
+        val rows = statisticsDao.updateGameWon(
             difficulty     = difficulty.name,
             gameTime       = gameTime,
             hintsUsed      = hintsUsed,
-            lastPlayedDate = currentDate
+            lastPlayedDate = today
         )
-
-        // Step 3: If the UPDATE still hit 0 rows (edge case), retry once with a forced seed
-        if (rowsUpdated == 0) {
-            Log.e(TAG, "❌ updateGameCompleted affected 0 rows! Forcing re-seed and retry")
+        if (rows == 0) {
+            Log.e(TAG, "❌ updateGameWon hit 0 rows — forcing re-seed + retry")
             statisticsDao.insertStatistics(StatisticsEntity())
-            val retryRows = statisticsDao.updateGameCompleted(
+            statisticsDao.updateGameWon(
                 difficulty     = difficulty.name,
                 gameTime       = gameTime,
                 hintsUsed      = hintsUsed,
-                lastPlayedDate = currentDate
+                lastPlayedDate = today
             )
-            Log.d(TAG, "Retry result: $retryRows rows updated")
-        } else {
-            Log.d(TAG, "✅ updateGameCompleted succeeded — $rowsUpdated row(s) updated")
         }
 
-        // Step 4: Read back and log for verification
-        val updated = statisticsDao.getStatistics()
-        if (updated != null) {
-            Log.d(TAG, "📈 Final statistics after completion:")
-            Log.d(TAG, "   gamesCompleted  = ${updated.gamesCompleted}")
-            Log.d(TAG, "   totalPlayTime   = ${updated.totalPlayTime} ms")
-            Log.d(TAG, "   bestTimeEasy    = ${updated.bestTimeEasy} ms")
-            Log.d(TAG, "   bestTimeMedium  = ${updated.bestTimeMedium} ms")
-            Log.d(TAG, "   bestTimeHard    = ${updated.bestTimeHard} ms")
-            Log.d(TAG, "   bestTimeExpert  = ${updated.bestTimeExpert} ms")
-            Log.d(TAG, "   currentStreak   = ${updated.currentStreak}")
-            Log.d(TAG, "   longestStreak   = ${updated.longestStreak}")
-            Log.d(TAG, "   totalHintsUsed  = ${updated.totalHintsUsed}")
-            Log.d(TAG, "   lastPlayedDate  = ${updated.lastPlayedDate}")
-        } else {
-            Log.e(TAG, "❌ getStatistics() still returned null after update — something is seriously wrong")
-        }
+        logCurrentState("after WIN")
     }
+
+    // -------------------------------------------------------------------------
+    // Record LOSS
+    // -------------------------------------------------------------------------
+
+    override suspend fun recordGameLost(gameTime: Long, hintsUsed: Int) {
+        val today = todayString()
+        Log.d(TAG, "📊 recordGameLost (LOSS) — time=${gameTime}ms, hints=$hintsUsed, date=$today")
+
+        ensureRowExists()
+
+        val rows = statisticsDao.updateGameLost(
+            gameTime       = gameTime,
+            hintsUsed      = hintsUsed,
+            lastPlayedDate = today
+        )
+        if (rows == 0) {
+            Log.e(TAG, "❌ updateGameLost hit 0 rows — forcing re-seed + retry")
+            statisticsDao.insertStatistics(StatisticsEntity())
+            statisticsDao.updateGameLost(
+                gameTime       = gameTime,
+                hintsUsed      = hintsUsed,
+                lastPlayedDate = today
+            )
+        }
+
+        logCurrentState("after LOSS")
+    }
+
+    // -------------------------------------------------------------------------
+    // Streak reset
+    // -------------------------------------------------------------------------
 
     override suspend fun resetCurrentStreak() {
         Log.d(TAG, "resetCurrentStreak() called")
@@ -121,33 +124,71 @@ class StatisticsRepositoryImpl @Inject constructor(
     }
 
     // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private fun todayString(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+    private suspend fun ensureRowExists() {
+        if (statisticsDao.getStatistics() == null) {
+            Log.w(TAG, "⚠️ statistics row missing — seeding defaults")
+            statisticsDao.insertStatistics(StatisticsEntity())
+        }
+    }
+
+    private suspend fun logCurrentState(label: String) {
+        val s = statisticsDao.getStatistics() ?: run {
+            Log.e(TAG, "❌ getStatistics() returned null $label — DB write failed!")
+            return
+        }
+        Log.d(TAG, "✅ Statistics $label:")
+        Log.d(TAG, "   totalGamesPlayed = ${s.totalGamesPlayed}")
+        Log.d(TAG, "   gamesCompleted   = ${s.gamesCompleted}")
+        Log.d(TAG, "   gamesLost        = ${s.gamesLost}")
+        Log.d(TAG, "   totalPlayTime    = ${s.totalPlayTime} ms")
+        Log.d(TAG, "   bestTimeEasy     = ${s.bestTimeEasy} ms")
+        Log.d(TAG, "   bestTimeMedium   = ${s.bestTimeMedium} ms")
+        Log.d(TAG, "   bestTimeHard     = ${s.bestTimeHard} ms")
+        Log.d(TAG, "   bestTimeExpert   = ${s.bestTimeExpert} ms")
+        Log.d(TAG, "   currentStreak    = ${s.currentStreak}")
+        Log.d(TAG, "   longestStreak    = ${s.longestStreak}")
+        Log.d(TAG, "   totalHintsUsed   = ${s.totalHintsUsed}")
+        Log.d(TAG, "   lastPlayedDate   = ${s.lastPlayedDate}")
+    }
+
+    // -------------------------------------------------------------------------
     // Mappers
     // -------------------------------------------------------------------------
 
     private fun StatisticsEntity.toDomainModel(): Statistics = Statistics(
-        gamesCompleted = gamesCompleted,
-        totalPlayTime  = totalPlayTime,
-        bestTimeEasy   = bestTimeEasy,
-        bestTimeMedium = bestTimeMedium,
-        bestTimeHard   = bestTimeHard,
-        bestTimeExpert = bestTimeExpert,
-        currentStreak  = currentStreak,
-        longestStreak  = longestStreak,
-        totalHintsUsed = totalHintsUsed,
-        lastPlayedDate = lastPlayedDate
+        gamesCompleted   = gamesCompleted,
+        totalGamesPlayed = totalGamesPlayed,
+        gamesLost        = gamesLost,
+        totalPlayTime    = totalPlayTime,
+        bestTimeEasy     = bestTimeEasy,
+        bestTimeMedium   = bestTimeMedium,
+        bestTimeHard     = bestTimeHard,
+        bestTimeExpert   = bestTimeExpert,
+        currentStreak    = currentStreak,
+        longestStreak    = longestStreak,
+        totalHintsUsed   = totalHintsUsed,
+        lastPlayedDate   = lastPlayedDate
     )
 
     private fun Statistics.toEntity(): StatisticsEntity = StatisticsEntity(
-        id             = 1,
-        gamesCompleted = gamesCompleted,
-        totalPlayTime  = totalPlayTime,
-        bestTimeEasy   = bestTimeEasy,
-        bestTimeMedium = bestTimeMedium,
-        bestTimeHard   = bestTimeHard,
-        bestTimeExpert = bestTimeExpert,
-        currentStreak  = currentStreak,
-        longestStreak  = longestStreak,
-        totalHintsUsed = totalHintsUsed,
-        lastPlayedDate = lastPlayedDate
+        id               = 1,
+        gamesCompleted   = gamesCompleted,
+        totalGamesPlayed = totalGamesPlayed,
+        gamesLost        = gamesLost,
+        totalPlayTime    = totalPlayTime,
+        bestTimeEasy     = bestTimeEasy,
+        bestTimeMedium   = bestTimeMedium,
+        bestTimeHard     = bestTimeHard,
+        bestTimeExpert   = bestTimeExpert,
+        currentStreak    = currentStreak,
+        longestStreak    = longestStreak,
+        totalHintsUsed   = totalHintsUsed,
+        lastPlayedDate   = lastPlayedDate
     )
 }

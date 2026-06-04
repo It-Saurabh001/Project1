@@ -22,7 +22,9 @@ class GameRepositoryImpl @Inject constructor(
     private val gson: Gson
 ): GameRepository{
     override suspend fun getCurrentGame(): Game? {
-        return gameDao.getCurrentGame()?.toDomainModel()
+        val game = gameDao.getCurrentGame()?.toDomainModel()
+        android.util.Log.d("GameRepository", "getCurrentGame() → ${game?.id?.take(8) ?: "null"}")
+        return game
     }
 
     override fun getCurrentGameFlow(): Flow<Game?> {
@@ -37,18 +39,23 @@ class GameRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getGameById(gameId: String): Game? {
-        return gameDao.getGameById(gameId)?.toDomainModel()
+        val game = gameDao.getGameById(gameId)?.toDomainModel()
+        android.util.Log.d("GameRepository", "getGameById($gameId) → ${game?.id?.take(8) ?: "null"}")
+        return game
     }
 
     override suspend fun saveGame(game: Game) {
+        android.util.Log.d("GameRepository", "saveGame() id=${game.id.take(8)}")
         gameDao.insertGame(game.toEntity())
     }
 
     override suspend fun updateGame(game: Game) {
+        android.util.Log.v("GameRepository", "updateGame() id=${game.id.take(8)}, state=${game.state}, mistakes=${game.mistakes}")
         gameDao.updateGame(game.toEntity())
     }
 
     override suspend fun deleteGame(gameId: String) {
+        android.util.Log.d("GameRepository", "deleteGame($gameId)")
         val game = gameDao.getGameById(gameId)
         if (game != null) {
             gameDao.deleteGame(game)

@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -15,6 +16,8 @@ fun NumberPad(
     onEraseSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val TAG = "NumberPad"
+    Log.d(TAG, "NumberPad composed with numberCounts: $numberCounts")
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally

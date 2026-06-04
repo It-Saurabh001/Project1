@@ -21,7 +21,7 @@ import android.util.Log
         StatisticsEntity::class,
         PuzzleEntity::class
     ],
-    version = 4,  // Updated from 3 to 4
+    version = 5,  // Updated from 4 to 5 for totalGamesPlayed and gamesLost
     exportSchema = false
 )
 abstract class SudokuDatabase : RoomDatabase() {
@@ -81,6 +81,25 @@ abstract class SudokuDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 4 to 5 (NEW - for totalGamesPlayed and gamesLost)
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                Log.d(TAG, "Migrating from version 4 to 5 — adding totalGamesPlayed and gamesLost")
+                try {
+                    // Add totalGamesPlayed column
+                    db.execSQL("ALTER TABLE statistics ADD COLUMN totalGamesPlayed INTEGER NOT NULL DEFAULT 0")
+                    Log.d(TAG, "Added totalGamesPlayed column")
+
+                    // Add gamesLost column
+                    db.execSQL("ALTER TABLE statistics ADD COLUMN gamesLost INTEGER NOT NULL DEFAULT 0")
+                    Log.d(TAG, "Added gamesLost column")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Migration 4→5 error: ${e.message}")
+                    throw e
+                }
+            }
+        }
+
         fun getDatabase(context: Context): SudokuDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -88,7 +107,7 @@ abstract class SudokuDatabase : RoomDatabase() {
                     SudokuDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

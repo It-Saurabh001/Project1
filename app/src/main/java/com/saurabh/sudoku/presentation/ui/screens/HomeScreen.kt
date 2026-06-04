@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val TAG = "HomeScreen"
+    Log.d(TAG, "HomeScreen composable called")
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentGame by viewModel.currentGame.collectAsStateWithLifecycle()
     val statistics by viewModel.statistics.collectAsStateWithLifecycle()
@@ -35,6 +38,7 @@ fun HomeScreen(
     // Handle navigation
     LaunchedEffect(uiState.navigateToGame, uiState.generatedGameId) {
         if (uiState.navigateToGame && uiState.generatedGameId != null) {
+            Log.d(TAG, "Navigating to game: ${uiState.generatedGameId}")
             onNavigateToGame(uiState.generatedGameId!!)
             viewModel.onNavigatedToGame()
         }

@@ -8,8 +8,19 @@ import javax.inject.Inject
 class SudokuGenerator @Inject constructor(private val solver: SudokuSolver) {
 
     fun generatePuzzle(difficulty: Difficulty): SudokuBoard {
+        android.util.Log.d("SudokuGenerator", "generatePuzzle() START - difficulty: $difficulty, clues target: ${difficulty.clues}")
         val solution = generateCompleteSudoku()
+        android.util.Log.d("SudokuGenerator", "generatePuzzle() solution generated")
         val puzzle = createPuzzle(solution, difficulty.clues)
+        
+        var actualClues = 0
+        for (r in 0..8) {
+            for (c in 0..8) {
+                if (puzzle[r][c] != 0) actualClues++
+            }
+        }
+        android.util.Log.d("SudokuGenerator", "generatePuzzle() puzzle created with $actualClues clues")
+
         val initialBoard = Array(9) { row ->
             IntArray(9) { col ->
                 puzzle[row][col]

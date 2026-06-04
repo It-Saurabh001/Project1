@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +39,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val TAG = "SettingsScreen"
+    Log.d(TAG, "SettingsScreen composable called")
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val soundEnabled by viewModel.soundEnabled.collectAsStateWithLifecycle()
     val autoNotes by viewModel.autoNotes.collectAsStateWithLifecycle()

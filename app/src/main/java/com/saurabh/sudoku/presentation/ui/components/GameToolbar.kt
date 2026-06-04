@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.components
 
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -38,6 +39,8 @@ fun GameToolbar(
     onResetClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val TAG = "GameToolbar"
+    Log.d(TAG, "GameToolbar composed with elapsedTime=$elapsedTime, hintsRemaining=$hintsRemaining, isPaused=$isPaused, mistakes=$mistakes/$maxMistakes, isNotesMode=$isNotesMode")
     val notesBgColor by animateColorAsState(
         targetValue = if (isNotesMode)
             MaterialTheme.colorScheme.primaryContainer

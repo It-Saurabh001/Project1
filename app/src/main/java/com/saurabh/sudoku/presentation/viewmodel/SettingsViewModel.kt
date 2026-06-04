@@ -41,35 +41,43 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     fun setThemeMode(mode: String) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setThemeMode: $mode")
         preferencesRepository.updateThemeMode(mode)
     }
 
     fun setSoundEnabled(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setSoundEnabled: $enabled")
         preferencesRepository.updateSoundEnabled(enabled)
     }
 
     fun setAutoNotes(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setAutoNotes: $enabled")
         preferencesRepository.updateAutoNotes(enabled)
     }
 
     fun setShowHints(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setShowHints: $enabled")
         preferencesRepository.updateShowHints(enabled)
     }
 
     fun setVibrationEnabled(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setVibrationEnabled: $enabled")
         preferencesRepository.updateVibrationEnabled(enabled)
         if (enabled) hapticFeedbackManager.performVibration()
     }
 
     fun setHighlightErrors(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setHighlightErrors: $enabled")
         preferencesRepository.updateHighlightErrors(enabled)
     }
 
     fun setAutoSave(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setAutoSave: $enabled")
         preferencesRepository.updateAutoSave(enabled)
     }
 
     fun setNotesModeEnabled(enabled: Boolean) = viewModelScope.launch {
+        android.util.Log.d("SettingsViewModel", "setNotesModeEnabled: $enabled")
         preferencesRepository.updateNotesModeEnabled(enabled)
     }
 }

@@ -1,5 +1,6 @@
 package com.saurabh.sudoku.presentation.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +26,8 @@ fun StatisticsScreen(
     modifier: Modifier = Modifier,
     viewModel: StatisticsViewModel = hiltViewModel()
 ) {
+    val TAG = "StatisticsScreen"
+    Log.d(TAG, "StatisticsScreen composable called")
     val statistics by viewModel.statistics.collectAsStateWithLifecycle()
 
     Scaffold(

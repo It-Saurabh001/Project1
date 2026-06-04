@@ -49,17 +49,21 @@ class HomeViewModel @Inject constructor(
         )
 
     fun onDifficultySelected(difficulty: Difficulty) {
+        android.util.Log.d("HomeViewModel", "onDifficultySelected() difficulty: $difficulty")
         _uiState.update { it.copy(selectedDifficulty = difficulty) }
     }
 
     fun startNewGame() {
         val difficulty = _uiState.value.selectedDifficulty
+        android.util.Log.d("HomeViewModel", "startNewGame() START difficulty: $difficulty")
 
         viewModelScope.launch {
             _uiState.update { it.copy(isGeneratingPuzzle = true) }
 
             try {
+                android.util.Log.d("HomeViewModel", "startNewGame() generating puzzle...")
                 val board = sudokuGenerator.generatePuzzle(difficulty)
+                android.util.Log.d("HomeViewModel", "startNewGame() puzzle generated")
                 val currentTime = DateUtils.getCurrentTimestamp()
                 val maxMistakes = Constants.getMaxMistakes(difficulty.name)
                 val game = Game(
@@ -75,6 +79,7 @@ class HomeViewModel @Inject constructor(
                     mistakes = 0,
                     maxMistakes = maxMistakes
                 )
+                android.util.Log.d("HomeViewModel", "startNewGame() saving new game: ${game.id.take(8)}")
                 gameRepository.saveGame(game)
 
                 _uiState.update {
@@ -84,7 +89,9 @@ class HomeViewModel @Inject constructor(
                         generatedGameId = game.id
                     )
                 }
+                android.util.Log.d("HomeViewModel", "startNewGame() SUCCESS")
             } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "startNewGame() FAILED: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isGeneratingPuzzle = false,
@@ -97,6 +104,7 @@ class HomeViewModel @Inject constructor(
 
     fun continueCurrentGame() {
         val game = currentGame.value
+        android.util.Log.d("HomeViewModel", "continueCurrentGame() gameId: ${game?.id?.take(8)}")
         if (game != null) {
             _uiState.update {
                 it.copy(
@@ -108,6 +116,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onNavigatedToGame() {
+        android.util.Log.d("HomeViewModel", "onNavigatedToGame() resetting navigation state")
         _uiState.update {
             it.copy(
                 navigateToGame = false,
