@@ -79,6 +79,16 @@ class GameRepositoryImpl @Inject constructor(
         val timestamp = DateUtils.getCurrentTimestamp() - (daysBefore * 24 * 60 * 60 * 1000L)
         gameDao.deleteOldCompletedGames(timestamp)
     }
+    override fun getHintlessWinsCountFlow(): Flow<Int> {
+        return gameDao.getHintlessWinsCountFlow()
+    }
+    override fun getPerfectWinsCountFlow(): Flow<Int> {
+        return gameDao.getPerfectWinsCountFlow()
+    }
+    override suspend fun deleteAbandonedGames(activeGameId: String) {
+        android.util.Log.d("GameRepository", "deleteAbandonedGames(except=$activeGameId)")
+        gameDao.deleteAbandonedGames(activeGameId)
+    }
 
     private fun GameEntity.toDomainModel(): Game {
         val boardType = object : TypeToken<Array<IntArray>>() {}.type

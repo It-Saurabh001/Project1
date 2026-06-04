@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saurabh.sudoku.presentation.ui.components.AchievementStatsCard
+import com.saurabh.sudoku.presentation.ui.components.AchievementsListCard
 import com.saurabh.sudoku.presentation.ui.components.BestTimesCard
 import com.saurabh.sudoku.presentation.ui.components.OverallStatsCard
 import com.saurabh.sudoku.presentation.viewmodel.StatisticsViewModel
@@ -29,6 +30,7 @@ fun StatisticsScreen(
     val TAG = "StatisticsScreen"
     Log.d(TAG, "StatisticsScreen composable called")
     val statistics by viewModel.statistics.collectAsStateWithLifecycle()
+    val achievements by viewModel.achievements.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier
@@ -75,6 +77,9 @@ fun StatisticsScreen(
 
             // Achievement Stats - 0 dikhega agar koi streak nahi hai
             AchievementStatsCard(statistics = statistics)
+
+            // Achievements Badge Room
+            AchievementsListCard(achievements = achievements)
 
             Spacer(modifier = Modifier.height(16.dp))
         }

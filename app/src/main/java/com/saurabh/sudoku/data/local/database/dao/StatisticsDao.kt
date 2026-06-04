@@ -31,16 +31,16 @@ interface StatisticsDao {
             totalGamesPlayed = totalGamesPlayed + 1,
             totalPlayTime    = totalPlayTime + :gameTime,
             bestTimeEasy     = CASE
-                WHEN :difficulty = 'EASY'   AND (bestTimeEasy   = 0 OR :gameTime < bestTimeEasy)
+                WHEN :difficulty = 'EASY'   AND (COALESCE(bestTimeEasy, 0) = 0 OR :gameTime < COALESCE(bestTimeEasy, 0))
                 THEN :gameTime ELSE bestTimeEasy   END,
             bestTimeMedium   = CASE
-                WHEN :difficulty = 'MEDIUM' AND (bestTimeMedium = 0 OR :gameTime < bestTimeMedium)
+                WHEN :difficulty = 'MEDIUM' AND (COALESCE(bestTimeMedium, 0) = 0 OR :gameTime < COALESCE(bestTimeMedium, 0))
                 THEN :gameTime ELSE bestTimeMedium END,
             bestTimeHard     = CASE
-                WHEN :difficulty = 'HARD'   AND (bestTimeHard   = 0 OR :gameTime < bestTimeHard)
+                WHEN :difficulty = 'HARD'   AND (COALESCE(bestTimeHard, 0) = 0 OR :gameTime < COALESCE(bestTimeHard, 0))
                 THEN :gameTime ELSE bestTimeHard   END,
             bestTimeExpert   = CASE
-                WHEN :difficulty = 'EXPERT' AND (bestTimeExpert = 0 OR :gameTime < bestTimeExpert)
+                WHEN :difficulty = 'EXPERT' AND (COALESCE(bestTimeExpert, 0) = 0 OR :gameTime < COALESCE(bestTimeExpert, 0))
                 THEN :gameTime ELSE bestTimeExpert END,
             currentStreak    = currentStreak + 1,
             longestStreak    = CASE

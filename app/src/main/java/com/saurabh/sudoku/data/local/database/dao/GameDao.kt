@@ -38,4 +38,13 @@ interface GameDao {
 
     @Query("SELECT COUNT(*) FROM games WHERE state = 'COMPLETED'")
     suspend fun getCompletedGamesCount(): Int
+
+    @Query("SELECT COUNT(*) FROM games WHERE state = 'COMPLETED' AND hintsUsed = 0")
+    fun getHintlessWinsCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM games WHERE state = 'COMPLETED' AND mistakes = 0")
+    fun getPerfectWinsCountFlow(): Flow<Int>
+
+    @Query("DELETE FROM games WHERE state IN ('PLAYING', 'PAUSED') AND id != :activeGameId")
+    suspend fun deleteAbandonedGames(activeGameId: String)
 }

@@ -14,4 +14,7 @@ interface GameRepository {
     fun getAllGames(): Flow<List<Game>>
     suspend fun getCompletedGamesCount(): Int
     suspend fun deleteOldCompletedGames(daysBefore: Int)
+    fun getHintlessWinsCountFlow(): Flow<Int>
+    fun getPerfectWinsCountFlow(): Flow<Int>
+    suspend fun deleteAbandonedGames(activeGameId: String)
 }

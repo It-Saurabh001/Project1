@@ -81,6 +81,7 @@ class HomeViewModel @Inject constructor(
                 )
                 android.util.Log.d("HomeViewModel", "startNewGame() saving new game: ${game.id.take(8)}")
                 gameRepository.saveGame(game)
+                gameRepository.deleteAbandonedGames(game.id)
 
                 _uiState.update {
                     it.copy(

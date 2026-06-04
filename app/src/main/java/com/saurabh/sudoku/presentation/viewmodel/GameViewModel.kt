@@ -104,6 +104,11 @@ class GameViewModel @Inject constructor(
 
     fun loadGame(gameId: String) {
         Log.d(TAG, "loadGame() called with gameId: $gameId")
+        if (currentGame?.id == gameId) {
+            Log.d(TAG, "loadGame() game already loaded, skipping DB load")
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
         dismissHint()
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
@@ -112,10 +117,16 @@ class GameViewModel @Inject constructor(
                 if (game != null) {
                     Log.d(TAG, "loadGame() successfully loaded game: ${game.id.take(8)}, difficulty: ${game.difficulty}, state: ${game.state}")
                     val conflicts = recomputeConflicts(game.board.board, game.board.solution)
-                    // Auto-resume paused games
-                    val loadedGame = if (game.state == GameState.PAUSED) {
-                        Log.d(TAG, "loadGame() auto-resuming paused game")
-                        game.copy(state = GameState.PLAYING)
+                    // Auto-resume paused or active games with current timestamps
+                    val loadedGame = if (game.state == GameState.PAUSED || game.state == GameState.PLAYING) {
+                        Log.d(TAG, "loadGame() auto-resuming game and aligning timestamps")
+                        val now = DateUtils.getCurrentTimestamp()
+                        val elapsed = game.elapsedTime
+                        game.copy(
+                            state = GameState.PLAYING,
+                            startTime = now - elapsed,
+                            currentTime = now
+                        )
                     } else game
                     currentGame = loadedGame
                     moveHistory.clear()
@@ -219,7 +230,7 @@ class GameViewModel @Inject constructor(
             soundManager.playNote()
 
             // Notes moves are NOT added to undo/redo history (keeps history clean for number moves)
-            val updatedGame = game.copy(notes = newNotes, currentTime = DateUtils.getCurrentTimestamp())
+            val updatedGame = game.copy(notes = newNotes, currentTime = game.currentTime)
             currentGame = updatedGame
             viewModelScope.launch {
                 gameRepository.updateGame(updatedGame)
@@ -257,7 +268,7 @@ class GameViewModel @Inject constructor(
         if (currentValue == 0 && hasNotes) {
             val newNotes = game.notes.copy()
             newNotes.clearNotes(row, col)
-            val updatedGame = game.copy(notes = newNotes, currentTime = DateUtils.getCurrentTimestamp())
+            val updatedGame = game.copy(notes = newNotes, currentTime = game.currentTime)
             currentGame = updatedGame
             viewModelScope.launch {
                 gameRepository.updateGame(updatedGame)
@@ -327,7 +338,7 @@ class GameViewModel @Inject constructor(
             Log.d(TAG, "makeMove() GAME OVER (mistakes limit reached)")
             val lostGame = updatedGame.copy(
                 state = GameState.LOST,
-                currentTime = DateUtils.getCurrentTimestamp()
+                currentTime = updatedGame.currentTime
             )
             currentGame = lostGame
             gameRepository.updateGame(lostGame)
@@ -368,7 +379,7 @@ class GameViewModel @Inject constructor(
             val updatedBoard = updatedGame.board.copy(board = newBoard)
             val finalGame = updatedGame.copy(
                 board = updatedBoard,
-                currentTime = DateUtils.getCurrentTimestamp(),
+                currentTime = updatedGame.currentTime,
                 state = GameState.PLAYING,
                 notes = notesAfter
             )
@@ -495,7 +506,7 @@ class GameViewModel @Inject constructor(
         val updatedGame = game.copy(
             board = updatedBoard,
             notes = notes,
-            currentTime = DateUtils.getCurrentTimestamp()
+            currentTime = game.currentTime
         )
         currentGame = updatedGame
         val conflicts = recomputeConflicts(newBoard, updatedGame.board.solution)
@@ -549,6 +560,7 @@ class GameViewModel @Inject constructor(
                     notes = Notes()
                 )
                 gameRepository.saveGame(newGame)
+                gameRepository.deleteAbandonedGames(newGame.id)
                 Log.d(TAG, "onNewGame() new game saved: ${newGame.id.take(8)}")
                 currentGame = newGame
                 moveHistory.clear()
@@ -637,7 +649,7 @@ class GameViewModel @Inject constructor(
         val updatedGame = game.copy(
             board = updatedBoard,
             hintsUsed = game.hintsUsed + 1,
-            currentTime = DateUtils.getCurrentTimestamp(),
+            currentTime = game.currentTime,
             notes = clearedNotes
         )
         currentGame = updatedGame
@@ -680,7 +692,7 @@ class GameViewModel @Inject constructor(
             hintsUsed = 0,
             mistakes = 0,
             notes = clearedNotes,
-            currentTime = DateUtils.getCurrentTimestamp()
+            currentTime = game.currentTime
         )
         currentGame = resetGame
         moveHistory.clear()
@@ -725,7 +737,7 @@ class GameViewModel @Inject constructor(
     private fun pauseGame() {
         val game = currentGame ?: return
         stopTimer()
-        val paused = game.copy(state = GameState.PAUSED, currentTime = DateUtils.getCurrentTimestamp())
+        val paused = game.copy(state = GameState.PAUSED, currentTime = game.currentTime)
         currentGame = paused
         viewModelScope.launch {
             gameRepository.updateGame(paused)
@@ -736,7 +748,13 @@ class GameViewModel @Inject constructor(
     private fun resumeGame() {
         val game = currentGame ?: return
         if (game.state == GameState.PLAYING) return
-        val resumed = game.copy(state = GameState.PLAYING)
+        val now = DateUtils.getCurrentTimestamp()
+        val elapsed = game.elapsedTime
+        val resumed = game.copy(
+            state = GameState.PLAYING,
+            startTime = now - elapsed,
+            currentTime = now
+        )
         currentGame = resumed
         _uiState.update { it.copy(game = resumed) }
         startTimer()
@@ -807,7 +825,7 @@ class GameViewModel @Inject constructor(
             if (game.state == GameState.PLAYING) {
                 viewModelScope.launch {
                     gameRepository.updateGame(
-                        game.copy(state = GameState.PAUSED, currentTime = DateUtils.getCurrentTimestamp())
+                        game.copy(state = GameState.PAUSED, currentTime = game.currentTime)
                     )
                 }
             }
