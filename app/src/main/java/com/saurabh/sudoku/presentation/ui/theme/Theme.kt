@@ -99,14 +99,11 @@ fun SudokuTheme(
             WindowCompat.setDecorFitsSystemWindows(window, false)
 
             // set background color status bar using windowInsetsControllerCompat
-            val windowInsetsController = WindowInsetsControllerCompat(window,view)
+            val windowInsetsController = WindowInsetsControllerCompat(window, view)
             windowInsetsController.isAppearanceLightStatusBars = !useDarkTheme
 
-            window.statusBarColor = colorScheme.background.toArgb()
-
-//             set status bar to transparent
-//            window.statusBarColor = Color.Transparent.toArgb()
-//            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme
+            // Status bar colour is transparent / system-controlled on API 30+.
+            // window.statusBarColor is deprecated — do not use.
         }
     }
 

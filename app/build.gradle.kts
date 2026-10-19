@@ -40,6 +40,17 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true   // silences android.util.Log in JVM unit tests
+        }
+    }
+
+    // Room schema export directory (optional, suppresses warning)
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
 }
 kotlin {
     compilerOptions {
@@ -88,4 +99,18 @@ dependencies {
     implementation(libs.gson)
 
     implementation(libs.dotlottie.android)
+
+
+    testImplementation (libs.mockito.kotlin)
+    testImplementation (libs.mockk)
+    testImplementation (libs.androidx.core.testing)
+    testImplementation (libs.kotlinx.coroutines.test)
+    testImplementation (libs.truth)
+
+    androidTestImplementation (libs.androidx.room.testing)
+    implementation(libs.lottie.compose)
+
+
+
+
 }

@@ -17,12 +17,14 @@ import com.saurabh.sudoku.presentation.utils.SoundManager
 import com.saurabh.sudoku.presentation.utils.deepCopy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -34,75 +36,64 @@ class GameViewModel @Inject constructor(
     private val validateMoveUseCase: ValidateMoveUseCase,
     private val soundManager: SoundManager,
     @ApplicationScope private val applicationScope: CoroutineScope
-
 ) : ViewModel() {
+
+    /**
+     * Every action that changes the game (moves, notes, hints, undo/redo, reset)
+     * runs inside this mutex and always reads [currentGame] INSIDE the lock.
+     * Never capture a Game before the lock - it may be stale by the time the lock is acquired.
+     */
     private val moveMutex = Mutex()
 
     private val TAG = "GameViewModel"
-    private val DEBUG = android.os.Build.TYPE != "user"
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+    private var loadJob: Job? = null
     private var currentGame: Game? = null
 
-    /**
-     * Extended Move stores the FULL notes snapshot before and after.
-     * This ensures undo/redo correctly restores the notes state.
-     */
     private data class Move(
         val row: Int,
         val col: Int,
         val oldValue: Int,
         val newValue: Int,
-        val notesBefore: Notes,    // snapshot of notes BEFORE this move
-        val notesAfter: Notes      // snapshot of notes AFTER this move
+        val notesBefore: Notes,
+        val notesAfter: Notes
     )
 
     private val moveHistory = mutableListOf<Move>()
     private var moveIndex = -1
 
+    private fun Game.isFinished() = state == GameState.LOST || state == GameState.COMPLETED
+
     // -------------------------------------------------------------------------
-    // Highlight helpers
+    // Helpers
     // -------------------------------------------------------------------------
 
-    private fun computeHighlights(board: Array<IntArray>, row: Int, col: Int): Pair<Set<Pair<Int, Int>>, Set<Pair<Int, Int>>> {
+    private fun computeHighlights(
+        board: Array<IntArray>, row: Int, col: Int
+    ): Pair<Set<Pair<Int, Int>>, Set<Pair<Int, Int>>> {
         val related = GameUtils.getRelatedCells(row, col)
         val sameNum = GameUtils.getSameNumberCells(board, row, col)
         return related to sameNum
     }
 
-    private fun updateHighlights(board: Array<IntArray>, selectedCell: Pair<Int, Int>?) {
-        if (selectedCell == null) {
-            _uiState.update { it.copy(highlightedCells = emptySet(), sameNumberCells = emptySet()) }
-            return
-        }
-        val (related, sameNum) = computeHighlights(board, selectedCell.first, selectedCell.second)
-        _uiState.update { it.copy(highlightedCells = related, sameNumberCells = sameNum) }
-    }
-
-    // -------------------------------------------------------------------------
-    // Number counts
-    // -------------------------------------------------------------------------
-
-    private fun computeNumberCounts(board: Array<IntArray>): Map<Int, Int> {
-        return (1..9).associateWith { number ->
+    private fun computeNumberCounts(board: Array<IntArray>): Map<Int, Int> =
+        (1..9).associateWith { number ->
             val used = board.sumOf { row -> row.count { it == number } }
             maxOf(0, 9 - used)
         }
-    }
 
-    private fun updateNumberCounts(board: Array<IntArray>) {
-        _uiState.update { it.copy(numberCounts = computeNumberCounts(board)) }
-    }
+    private fun recomputeConflicts(board: Array<IntArray>, solution: Array<IntArray>): Set<Pair<Int, Int>> =
+        GameUtils.computeAllConflicts(board, solution)
 
-    // -------------------------------------------------------------------------
-    // Conflict detection (uses improved dual-strategy detector)
-    // -------------------------------------------------------------------------
-
-    private fun recomputeConflicts(board: Array<IntArray>, solution: Array<IntArray>): Set<Pair<Int, Int>> {
-        return GameUtils.computeAllConflicts(board, solution)
+    /** Saves whatever the latest game is, in order with other writes. Safe to call from anywhere. */
+    private fun persistLatest() {
+        viewModelScope.launch {
+            moveMutex.withLock { currentGame?.let { gameRepository.updateGame(it) } }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -110,23 +101,20 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun loadGame(gameId: String) {
-        Log.d(TAG, "loadGame() called with gameId: $gameId")
+        Log.d(TAG, "loadGame() gameId: $gameId")
         if (currentGame?.id == gameId) {
-            Log.d(TAG, "loadGame() game already loaded, skipping DB load")
             _uiState.update { it.copy(isLoading = false) }
             return
         }
         dismissHint()
         _uiState.update { it.copy(isLoading = true) }
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             try {
                 val game = gameRepository.getGameById(gameId)
                 if (game != null) {
-                    Log.d(TAG, "loadGame() successfully loaded game: ${game.id.take(8)}, difficulty: ${game.difficulty}, state: ${game.state}")
                     val conflicts = recomputeConflicts(game.board.board, game.board.solution)
-                    // Auto-resume paused or active games with current timestamps
                     val loadedGame = if (game.state == GameState.PAUSED || game.state == GameState.PLAYING) {
-                        Log.d(TAG, "loadGame() auto-resuming game and aligning timestamps")
                         val now = DateUtils.getCurrentTimestamp()
                         val elapsed = game.elapsedTime
                         game.copy(
@@ -154,14 +142,13 @@ class GameViewModel @Inject constructor(
                             maxMistakes = loadedGame.maxMistakes
                         )
                     }
-                    if (loadedGame.state == GameState.PLAYING) {
-                        Log.d(TAG, "loadGame() starting timer")
-                        startTimer()
-                    }
+                    if (loadedGame.state == GameState.PLAYING) startTimer()
                 } else {
-                    Log.e(TAG, "loadGame() failed: gameId $gameId not found in repository")
+                    Log.e(TAG, "loadGame() gameId $gameId not found")
                     _uiState.update { it.copy(isLoading = false, error = "Game not found") }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "loadGame() exception: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false, error = "Failed to load: ${e.message}") }
@@ -174,29 +161,18 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onCellSelected(row: Int, col: Int) {
-        Log.d(TAG, "onCellSelected() row: $row, col: $col")
         val state = _uiState.value
         val game = state.game ?: return
         soundManager.playClick()
 
-        val newSelected = if (state.selectedCell == (row to col)) {
-            Log.d(TAG, "onCellSelected() deselecting cell")
-            null
-        } else (row to col)
-        
-        if (newSelected == null) {
+        if (state.selectedCell == (row to col)) {
             _uiState.update {
                 it.copy(selectedCell = null, highlightedCells = emptySet(), sameNumberCells = emptySet())
             }
         } else {
             val (related, sameNum) = computeHighlights(game.board.board, row, col)
-            Log.d(TAG, "onCellSelected() highlighting related: ${related.size} cells, sameNumber: ${sameNum.size} cells")
             _uiState.update {
-                it.copy(
-                    selectedCell = newSelected,
-                    highlightedCells = related,
-                    sameNumberCells = sameNum
-                )
+                it.copy(selectedCell = row to col, highlightedCells = related, sameNumberCells = sameNum)
             }
         }
     }
@@ -206,113 +182,109 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onNumberSelected(number: Int) {
-        Log.d(TAG, "onNumberSelected() number: $number")
         val state = _uiState.value
         val selected = state.selectedCell ?: run {
-            Log.w(TAG, "onNumberSelected() no cell selected")
             showToast("Select a cell first")
             return
         }
         val game = state.game ?: return
+        if (game.isFinished()) return
         val (row, col) = selected
 
         if (game.board.isInitialCell(row, col)) {
-            Log.d(TAG, "onNumberSelected() attempt to modify clue cell at ($row, $col)")
             showToast("Cannot modify a clue cell")
             return
         }
 
-        val currentValue = game.board.getCurrentValue(row, col)
-
         // ---- NOTES MODE ----
-        if (state.isNotesMode && currentValue == 0) {
-            Log.d(TAG, "onNumberSelected() notes mode: toggling note $number at ($row, $col)")
-            val notesBefore = game.notes.deepCopy()
-            val newNotes = game.notes.deepCopy()
-            if (newNotes.getNotes(row, col).contains(number)) {
-                newNotes.removeNote(row, col, number)
-            } else {
-                newNotes.addNote(row, col, number)
-            }
+        if (state.isNotesMode && game.board.getCurrentValue(row, col) == 0) {
             soundManager.playNote()
-
-            // Notes moves are NOT added to undo/redo history (keeps history clean for number moves)
-            val updatedGame = game.copy(notes = newNotes, currentTime = game.currentTime)
-            currentGame = updatedGame
-            viewModelScope.launch {
-                gameRepository.updateGame(updatedGame)
-                _uiState.update { it.copy(game = updatedGame, notes = newNotes) }
-            }
+            viewModelScope.launch { moveMutex.withLock { toggleNote(row, col, number) } }
             return
         }
 
         // ---- NUMBER MODE ----
-        // Ensure game is running
-        if (currentGame?.state != GameState.PLAYING) {
-            Log.d(TAG, "onNumberSelected() game not playing, resuming...")
-            resumeGame()
+        viewModelScope.launch {
+            moveMutex.withLock {
+                if (currentGame?.state == GameState.PAUSED) resumeGame()
+                makeMove(row, col, number)
+            }
         }
-        Log.d(TAG, "onNumberSelected() number mode: placing $number at ($row, $col)")
-        viewModelScope.launch { moveMutex.withLock { makeMove(row, col, number, game.notes.deepCopy()) } }
     }
 
     fun onEraseSelected() {
-        val state = _uiState.value
-        val selected = state.selectedCell ?: return
-        val (row, col) = selected
-        val game = state.game ?: return
+        val (row, col) = _uiState.value.selectedCell ?: return
+        viewModelScope.launch {
+            moveMutex.withLock {
+                val game = currentGame ?: return@withLock
+                if (game.isFinished()) return@withLock
+                if (game.board.isInitialCell(row, col)) return@withLock
 
-        if (game.board.isInitialCell(row, col)) return
+                val currentValue = game.board.getCurrentValue(row, col)
+                val hasNotes = game.notes.getNotes(row, col).isNotEmpty()
+                if (currentValue == 0 && !hasNotes) return@withLock
 
-        val currentValue = game.board.getCurrentValue(row, col)
-        val hasNotes = game.notes.getNotes(row, col).isNotEmpty()
+                soundManager.playErase()
 
-        if (currentValue == 0 && !hasNotes) return // Nothing to erase
-
-        soundManager.playErase()
-
-        // Erase notes first (if cell is empty but has notes)
-        if (currentValue == 0 && hasNotes) {
-            val newNotes = game.notes.deepCopy()
-            newNotes.clearNotes(row, col)
-            val updatedGame = game.copy(notes = newNotes, currentTime = game.currentTime)
-            currentGame = updatedGame
-            viewModelScope.launch {
-                gameRepository.updateGame(updatedGame)
-                _uiState.update { it.copy(game = updatedGame, notes = newNotes) }
+                if (currentValue == 0) {
+                    // erase notes only
+                    val newNotes = game.notes.deepCopy()
+                    newNotes.clearNotes(row, col)
+                    applyNotes(game, newNotes)
+                } else {
+                    if (game.state == GameState.PAUSED) resumeGame()
+                    makeMove(row, col, 0)
+                }
             }
-            return
         }
-
-        // Erase the number — push to undo history
-        if (currentGame?.state != GameState.PLAYING) resumeGame()
-        viewModelScope.launch { moveMutex.withLock { makeMove(row, col, 0, game.notes.deepCopy()) } }
     }
 
     // -------------------------------------------------------------------------
-    // Core move engine
+    // Notes (always called inside moveMutex)
     // -------------------------------------------------------------------------
 
-    private suspend fun makeMove(row: Int, col: Int, number: Int, notesBefore: Notes) {
-        Log.d(TAG, "makeMove() START row: $row, col: $col, number: $number")
+    private suspend fun toggleNote(row: Int, col: Int, number: Int) {
         val game = currentGame ?: return
+        if (game.isFinished()) return
+        if (game.board.isInitialCell(row, col)) return
+        if (game.board.getCurrentValue(row, col) != 0) return
 
-        if (game.state == GameState.LOST || game.state == GameState.COMPLETED) {
-            Log.w(TAG, "makeMove() ignored: game state is ${game.state}")
+        val newNotes = game.notes.deepCopy()
+        if (newNotes.getNotes(row, col).contains(number)) {
+            newNotes.removeNote(row, col, number)
+        } else {
+            newNotes.addNote(row, col, number)
+        }
+        applyNotes(game, newNotes)
+    }
+
+    private suspend fun applyNotes(game: Game, newNotes: Notes) {
+        val updated = game.copy(notes = newNotes)
+        currentGame = updated
+        _uiState.update { it.copy(game = updated, notes = newNotes) }   // UI first, no suspension before this
+        gameRepository.updateGame(updated)
+    }
+
+    // -------------------------------------------------------------------------
+    // Core move engine (always called inside moveMutex)
+    //
+    // Rule: compute from currentGame and publish (currentGame + UI) WITHOUT suspending,
+    // and only then persist. That way a timer tick can never be lost or overwritten.
+    // -------------------------------------------------------------------------
+
+    private suspend fun makeMove(row: Int, col: Int, number: Int) {
+        val game = currentGame ?: return
+        if (game.state != GameState.PLAYING) {
+            Log.w(TAG, "makeMove() ignored: state=${game.state}")
             return
         }
-        if (game.board.isInitialCell(row, col)) {
-            Log.w(TAG, "makeMove() ignored: initial cell at ($row, $col)")
-            return
-        }
+        if (game.board.isInitialCell(row, col)) return
 
         val oldValue = game.board.getCurrentValue(row, col)
-        if (oldValue == number) {
-            Log.d(TAG, "makeMove() ignored: number $number already at ($row, $col)")
-            return
-        }
+        if (oldValue == number) return
 
-        // Validate
+        val notesBefore = game.notes.deepCopy()
+
         val validation = validateMoveUseCase(
             board = game.board,
             row = row, col = col,
@@ -320,19 +292,18 @@ class GameViewModel @Inject constructor(
             currentMistakes = game.mistakes,
             maxMistakes = game.maxMistakes
         )
-        Log.d(TAG, "makeMove() validation result: isValid=${validation.isValid}, canPlace=${validation.canPlaceNumber}, mistakes=${validation.newMistakes}/${game.maxMistakes}")
 
         var updatedGame = game
 
-        // Apply mistake count change
+        // Mistake count changed
         if (validation.newMistakes != game.mistakes) {
-            Log.d(TAG, "makeMove() mistake made! New mistake count: ${validation.newMistakes}")
             updatedGame = game.copy(mistakes = validation.newMistakes)
             currentGame = updatedGame
             soundManager.playMistake()
             _uiState.update {
                 it.copy(
                     game = updatedGame,
+                    mistakes = validation.newMistakes,           // keep ui mistakes in sync
                     mistakeMessage = validation.message,
                     showMistakeToast = true,
                     lastMistakeCell = row to col
@@ -342,159 +313,126 @@ class GameViewModel @Inject constructor(
 
         // Game over
         if (validation.isGameOver) {
-            Log.d(TAG, "makeMove() GAME OVER (mistakes limit reached)")
-            val lostGame = updatedGame.copy(
-                state = GameState.LOST,
-                currentTime = updatedGame.currentTime
-            )
+            val lostGame = updatedGame.copy(state = GameState.LOST)
             currentGame = lostGame
-            gameRepository.updateGame(lostGame)
-            // Record the loss in statistics
-            viewModelScope.launch {
-                statisticsRepository.recordGameLost(updatedGame.elapsedTime, updatedGame.hintsUsed)
-            }
-            _uiState.update { it.copy(game = lostGame, showGameOverDialog = true) }
             stopTimer()
+            _uiState.update { it.copy(game = lostGame, showGameOverDialog = true) }
+            gameRepository.updateGame(lostGame)
+            statisticsRepository.recordGameLost(lostGame.elapsedTime, lostGame.hintsUsed)
             return
         }
 
-        // Place number on board
-        if (validation.canPlaceNumber) {
-            Log.d(TAG, "makeMove() placing number $number on board")
-            val newBoard = updatedGame.board.board.map { it.clone() }.toTypedArray()
-            newBoard[row][col] = number
+        // Rejected move: still persist the new mistake count
+        if (!validation.canPlaceNumber) {
+            if (updatedGame !== game) gameRepository.updateGame(updatedGame)
+            return
+        }
 
-            // Auto-remove notes in same row/col/box when placing a correct number
-            val notesAfter = notesBefore.deepCopy()
-            if (number != 0 && validation.isValid) {
-                Log.d(TAG, "makeMove() auto-removing notes for $number")
-                notesAfter.autoRemoveNotes(row, col, number, newBoard)
-            } else if (number != 0) {
-                Log.d(TAG, "makeMove() clearing notes at ($row, $col)")
-                notesAfter.clearNotes(row, col) // Also clear notes at this cell
-            }
+        // Place number
+        val newBoard = updatedGame.board.board.map { it.clone() }.toTypedArray()
+        newBoard[row][col] = number
 
-            // Push to undo/redo history
-            if (moveIndex < moveHistory.size - 1) {
-                Log.d(TAG, "makeMove() clearing forward history for redo")
-                moveHistory.subList(moveIndex + 1, moveHistory.size).clear()
-            }
-            moveHistory.add(Move(row, col, oldValue, number, notesBefore, notesAfter))
-            moveIndex++
-            Log.d(TAG, "makeMove() move added to history. Index: $moveIndex, Size: ${moveHistory.size}")
+        val notesAfter = notesBefore.deepCopy()
+        if (number != 0 && validation.isValid) {
+            notesAfter.autoRemoveNotes(row, col, number, newBoard)
+        } else if (number != 0) {
+            notesAfter.clearNotes(row, col)
+        }
 
-            val updatedBoard = updatedGame.board.copy(board = newBoard)
-            val finalGame = updatedGame.copy(
-                board = updatedBoard,
-                currentTime = updatedGame.currentTime,
-                state = GameState.PLAYING,
-                notes = notesAfter
+        if (moveIndex < moveHistory.size - 1) {
+            moveHistory.subList(moveIndex + 1, moveHistory.size).clear()
+        }
+        moveHistory.add(Move(row, col, oldValue, number, notesBefore, notesAfter))
+        moveIndex++
+
+        val finalGame = updatedGame.copy(
+            board = updatedGame.board.copy(board = newBoard),
+            notes = notesAfter
+        )
+        currentGame = finalGame
+
+        val conflicts = recomputeConflicts(newBoard, finalGame.board.solution)
+        val (related, sameNum) = if (_uiState.value.selectedCell != null) {
+            computeHighlights(newBoard, row, col)
+        } else emptySet<Pair<Int, Int>>() to emptySet()
+
+        _uiState.update {
+            it.copy(
+                game = finalGame,
+                notes = notesAfter,
+                conflictCells = conflicts,
+                highlightedCells = related,
+                sameNumberCells = sameNum,
+                lastPlacedCell = if (validation.isValid && number != 0) row to col else null,
+                numberCounts = computeNumberCounts(newBoard)
             )
-            currentGame = finalGame
-            gameRepository.updateGame(finalGame)
+        }
 
-            val conflicts = recomputeConflicts(newBoard, finalGame.board.solution)
-            val (related, sameNum) = if (_uiState.value.selectedCell != null) {
-                computeHighlights(newBoard, row, col)
-            } else emptySet<Pair<Int, Int>>() to emptySet()
+        gameRepository.updateGame(finalGame)
 
-            _uiState.update {
-                it.copy(
-                    game = finalGame,
-                    notes = notesAfter,
-                    conflictCells = conflicts,
-                    highlightedCells = related,
-                    sameNumberCells = sameNum,
-                    lastPlacedCell = if (validation.isValid && number != 0) row to col else null,
-                    numberCounts = computeNumberCounts(newBoard)
-                )
-            }
-
-            if (validation.isValid && number != 0) {
-                Log.d(TAG, "makeMove() correct move! Checking for completion...")
-                soundManager.playCorrect()
-                checkGameCompletion(finalGame)
-            }
+        if (validation.isValid && number != 0) {
+            soundManager.playCorrect()
+            checkGameCompletion()
         }
     }
 
     // -------------------------------------------------------------------------
-    // Game completion
+    // Game completion (always called inside moveMutex)
     // -------------------------------------------------------------------------
 
-    private suspend fun checkGameCompletion(game: Game) {
-        val isComplete = GameUtils.isBoardComplete(game.board.board)
-        Log.d(TAG, "checkGameCompletion: isBoardComplete=$isComplete, state=${game.state}, id=${game.id.take(8)}")
+    private suspend fun checkGameCompletion() {
+        val game = currentGame ?: return          // always the freshest game, never a stale copy
+        if (game.state == GameState.COMPLETED) return
+        if (!GameUtils.isBoardComplete(game.board.board)) return
 
-        if (!isComplete) return
-        if (game.state == GameState.COMPLETED) {
-            Log.w(TAG, "checkGameCompletion: already COMPLETED — skipping duplicate call")
-            return
-        }
-
-        // elapsedTime = currentTime - startTime (cumulative timer, pauses excluded)
         val gameTime = game.elapsedTime
-        Log.d(TAG, "🏁 Game COMPLETED! difficulty=${game.difficulty}, elapsedTime=${gameTime}ms, hints=${game.hintsUsed}")
-
-        Log.d(TAG, "→ Calling statisticsRepository.recordGameCompleted()")
-        statisticsRepository.recordGameCompleted(
-            difficulty = game.difficulty,
-            gameTime   = gameTime,
-            hintsUsed  = game.hintsUsed
-        )
-        Log.d(TAG, "← statisticsRepository.recordGameCompleted() returned")
-
-        val completedAt = DateUtils.getCurrentTimestamp()
         val completedGame = game.copy(
-            state       = GameState.COMPLETED,
-            completedAt = completedAt,
-            currentTime = game.currentTime  // keep the timer value; don't overwrite with wall clock
+            state = GameState.COMPLETED,
+            completedAt = DateUtils.getCurrentTimestamp()
         )
         currentGame = completedGame
-
-        Log.d(TAG, "→ Persisting COMPLETED state to Room for game ${game.id.take(8)}")
-        gameRepository.updateGame(completedGame)
-        Log.d(TAG, "← Room update complete — game is now COMPLETED in DB")
-
+        stopTimer()
         soundManager.playComplete()
+
         _uiState.update {
             it.copy(
                 game = completedGame,
-                conflictCells    = emptySet(),
+                conflictCells = emptySet(),
                 highlightedCells = emptySet(),
-                sameNumberCells  = emptySet(),
+                sameNumberCells = emptySet(),
                 showCompletionDialog = true,
-                completionTime   = gameTime,
-                numberCounts     = computeNumberCounts(completedGame.board.board)
+                completionTime = gameTime,
+                numberCounts = computeNumberCounts(completedGame.board.board)
             )
         }
-        stopTimer()
-        Log.d(TAG, "✅ checkGameCompletion done — dialog shown, timer stopped")
+
+        // Persist the game FIRST, then record stats.
+        // If the app dies in between we lose one stat instead of double-counting it later.
+        gameRepository.updateGame(completedGame)
+        statisticsRepository.recordGameCompleted(
+            difficulty = game.difficulty,
+            gameTime = gameTime,
+            hintsUsed = game.hintsUsed
+        )
     }
 
-
     // -------------------------------------------------------------------------
-    // Undo / Redo (now with full notes restoration)
+    // Undo / Redo
     // -------------------------------------------------------------------------
 
     fun onUndoMove() {
-        Log.d(TAG, "onUndoMove() moveIndex=$moveIndex")
-        // Quick pre-check without lock — avoids launching a coroutine needlessly.
-        // The authoritative check happens inside the lock.
         if (moveIndex < 0) {
-            Log.d(TAG, "onUndoMove() nothing to undo (fast path)")
             showToast("Nothing to undo")
             return
         }
         viewModelScope.launch {
             moveMutex.withLock {
+                if (currentGame?.state != GameState.PLAYING) return@withLock   // no undo after win/loss/pause
                 if (moveIndex < 0) {
-                    Log.d(TAG, "onUndoMove() nothing to undo")
                     showToast("Nothing to undo")
                     return@withLock
                 }
                 val move = moveHistory[moveIndex]
-                Log.d(TAG, "onUndoMove() undoing move at (${move.row}, ${move.col}) from ${move.newValue} back to ${move.oldValue}")
                 moveIndex--
                 applyBoardChange(move.row, move.col, move.oldValue, move.notesBefore)
                 soundManager.playClick()
@@ -503,57 +441,52 @@ class GameViewModel @Inject constructor(
     }
 
     fun onRedoMove() {
-        Log.d(TAG, "onRedoMove() moveIndex=$moveIndex, historySize=${moveHistory.size}")
-        // Quick pre-check without lock — avoids launching a coroutine needlessly.
         if (moveIndex >= moveHistory.size - 1) {
-            Log.d(TAG, "onRedoMove() nothing to redo (fast path)")
             showToast("Nothing to redo")
             return
         }
         viewModelScope.launch {
             moveMutex.withLock {
+                if (currentGame?.state != GameState.PLAYING) return@withLock
                 if (moveIndex >= moveHistory.size - 1) {
-                    Log.d(TAG, "onRedoMove() nothing to redo")
                     showToast("Nothing to redo")
                     return@withLock
                 }
                 moveIndex++
                 val move = moveHistory[moveIndex]
-                Log.d(TAG, "onRedoMove() redoing move at (${move.row}, ${move.col}) from ${move.oldValue} to ${move.newValue}")
                 applyBoardChange(move.row, move.col, move.newValue, move.notesAfter)
                 soundManager.playClick()
             }
         }
     }
 
-    private fun applyBoardChange(row: Int, col: Int, value: Int, notes: Notes) {
+    /** suspend + called inside the mutex, so rapid undo/redo are applied strictly in order. */
+    private suspend fun applyBoardChange(row: Int, col: Int, value: Int, notes: Notes) {
         val game = currentGame ?: return
         val newBoard = game.board.board.map { it.clone() }.toTypedArray()
         newBoard[row][col] = value
-        val updatedBoard = game.board.copy(board = newBoard)
         val updatedGame = game.copy(
-            board = updatedBoard,
-            notes = notes,
-            currentTime = game.currentTime
+            board = game.board.copy(board = newBoard),
+            notes = notes
         )
         currentGame = updatedGame
+
         val conflicts = recomputeConflicts(newBoard, updatedGame.board.solution)
         val sel = _uiState.value.selectedCell
         val (related, sameNum) = if (sel != null) computeHighlights(newBoard, sel.first, sel.second)
-                                  else emptySet<Pair<Int, Int>>() to emptySet()
-        viewModelScope.launch {
-            gameRepository.updateGame(updatedGame)
-            _uiState.update {
-                it.copy(
-                    game = updatedGame,
-                    notes = notes,
-                    conflictCells = conflicts,
-                    highlightedCells = related,
-                    sameNumberCells = sameNum,
-                    numberCounts = computeNumberCounts(newBoard)
-                )
-            }
+        else emptySet<Pair<Int, Int>>() to emptySet()
+
+        _uiState.update {
+            it.copy(
+                game = updatedGame,
+                notes = notes,
+                conflictCells = conflicts,
+                highlightedCells = related,
+                sameNumberCells = sameNum,
+                numberCounts = computeNumberCounts(newBoard)
+            )
         }
+        gameRepository.updateGame(updatedGame)
     }
 
     // -------------------------------------------------------------------------
@@ -561,27 +494,28 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onNewGame() {
-        Log.d(TAG, "onNewGame() requested")
+        if (_uiState.value.isGeneratingNewGame) return        // ignore double taps
         dismissHint()
         val currentDifficulty = currentGame?.difficulty ?: Difficulty.MEDIUM
-        Log.d(TAG, "onNewGame() starting generation for difficulty: $currentDifficulty")
         viewModelScope.launch {
             _uiState.update { it.copy(isGeneratingNewGame = true) }
             try {
-                val board = sudokuGenerator.generatePuzzle(currentDifficulty)
-                Log.d(TAG, "onNewGame() puzzle generated successfully")
-                val currentTime = DateUtils.getCurrentTimestamp()
+                // Heavy CPU work: keep it off the main thread
+                val board = withContext(Dispatchers.Default) {
+                    sudokuGenerator.generatePuzzle(currentDifficulty)
+                }
+                val now = DateUtils.getCurrentTimestamp()
                 val maxMistakes = Constants.getMaxMistakes(currentDifficulty.name)
                 val newGame = Game(
                     id = UUID.randomUUID().toString(),
                     board = board,
                     initialBoard = board.deepCopy(),
                     difficulty = currentDifficulty,
-                    startTime = currentTime,
-                    currentTime = currentTime,
+                    startTime = now,
+                    currentTime = now,
                     state = GameState.PLAYING,
                     hintsUsed = 0,
-                    createdAt = currentTime,
+                    createdAt = now,
                     completedAt = null,
                     mistakes = 0,
                     maxMistakes = maxMistakes,
@@ -589,10 +523,12 @@ class GameViewModel @Inject constructor(
                 )
                 gameRepository.saveGame(newGame)
                 gameRepository.deleteAbandonedGames(newGame.id)
-                Log.d(TAG, "onNewGame() new game saved: ${newGame.id.take(8)}")
-                currentGame = newGame
-                moveHistory.clear()
-                moveIndex = -1
+
+                moveMutex.withLock {
+                    currentGame = newGame
+                    moveHistory.clear()
+                    moveIndex = -1
+                }
                 _uiState.update {
                     it.copy(
                         game = newGame,
@@ -615,8 +551,10 @@ class GameViewModel @Inject constructor(
                     )
                 }
                 startTimer()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "onNewGame() failed to generate puzzle: ${e.message}", e)
+                Log.e(TAG, "onNewGame() failed: ${e.message}", e)
                 _uiState.update {
                     it.copy(isGeneratingNewGame = false, error = "Failed to generate puzzle: ${e.message}")
                 }
@@ -629,35 +567,38 @@ class GameViewModel @Inject constructor(
     // -------------------------------------------------------------------------
 
     fun onHintRequested() {
-        Log.d(TAG, "onHintRequested() START")
         val game = currentGame ?: return
+        if (game.isFinished()) return
         if (game.hintsUsed >= Constants.MAX_HINTS) {
-            Log.d(TAG, "onHintRequested() limit reached: ${game.hintsUsed}/${Constants.MAX_HINTS}")
             showToast("No more hints available (${Constants.MAX_HINTS} used)")
             return
         }
-        val selected = _uiState.value.selectedCell
-        if (selected == null) {
-            Log.d(TAG, "onHintRequested() no cell selected")
+        val (r, c) = _uiState.value.selectedCell ?: run {
             showToast("Tap an empty cell to get a hint")
             return
         }
-        val (r, c) = selected
         if (game.board.getCurrentValue(r, c) != 0) {
-            Log.d(TAG, "onHintRequested() cell at ($r, $c) is already filled")
             showToast("Hint only works on empty cells")
             return
         }
-        val hint = GameUtils.getHintForCell(game.board.board, game.board.solution, r, c) ?: run {
-            Log.w(TAG, "onHintRequested() no hint available for ($r, $c)")
+        if (GameUtils.getHintForCell(game.board.board, game.board.solution, r, c) == null) {
             showToast("No hint available for this cell")
             return
         }
-        Log.d(TAG, "onHintRequested() hint found: value ${hint.value} for ($r, $c)")
-        viewModelScope.launch { moveMutex.withLock { applyHintAt(game, r, c, hint.value) } }
+        // Everything is re-validated against the LATEST game inside the lock
+        viewModelScope.launch { moveMutex.withLock { applyHintAt(r, c) } }
     }
 
-    private suspend fun applyHintAt(game: Game, r: Int, c: Int, value: Int) {
+    private suspend fun applyHintAt(r: Int, c: Int) {
+        if (currentGame?.state == GameState.PAUSED) resumeGame()
+        val game = currentGame ?: return
+        if (game.state != GameState.PLAYING) return
+        if (game.hintsUsed >= Constants.MAX_HINTS) return
+        if (game.board.getCurrentValue(r, c) != 0) return
+        val hint = GameUtils.getHintForCell(game.board.board, game.board.solution, r, c) ?: return
+        val value = hint.value
+
+        val notesBefore = game.notes.deepCopy()
         val clearedNotes = game.notes.deepCopy()
         clearedNotes.clearNotes(r, c)
 
@@ -665,8 +606,6 @@ class GameViewModel @Inject constructor(
         newBoard[r][c] = value
         clearedNotes.autoRemoveNotes(r, c, value, newBoard)
 
-        // Hints also push to undo history
-        val notesBefore = game.notes.deepCopy()
         if (moveIndex < moveHistory.size - 1) {
             moveHistory.subList(moveIndex + 1, moveHistory.size).clear()
         }
@@ -677,11 +616,9 @@ class GameViewModel @Inject constructor(
         val updatedGame = game.copy(
             board = updatedBoard,
             hintsUsed = game.hintsUsed + 1,
-            currentTime = game.currentTime,
             notes = clearedNotes
         )
         currentGame = updatedGame
-        gameRepository.updateGame(updatedGame)
 
         val conflicts = recomputeConflicts(newBoard, updatedBoard.solution)
         val (related, sameNum) = computeHighlights(newBoard, r, c)
@@ -702,52 +639,56 @@ class GameViewModel @Inject constructor(
             )
         }
         soundManager.playCorrect()
-        checkGameCompletion(updatedGame)
+        gameRepository.updateGame(updatedGame)
+        checkGameCompletion()
     }
 
     // -------------------------------------------------------------------------
     // Reset board
+    // NOTE: now returns Unit (was Job) and runs under the mutex.
     // -------------------------------------------------------------------------
 
-    fun onResetBoard() = viewModelScope.launch {
-        Log.d(TAG, "onResetBoard() START")
-        val game = _uiState.value.game ?: return@launch
-        val freshBoard = game.initialBoard.deepCopy()
-        val clearedNotes = Notes()
-        val resetGame = game.copy(
-            board = freshBoard,
-            state = GameState.PLAYING,
-            hintsUsed = 0,
-            mistakes = 0,
-            notes = clearedNotes,
-            currentTime = game.currentTime
-        )
-        currentGame = resetGame
-        moveHistory.clear()
-        moveIndex = -1
-        Log.d(TAG, "onResetBoard() resetting game in repository")
-        gameRepository.updateGame(resetGame)
-        soundManager.playClick()
-        _uiState.update {
-            it.copy(
-                game = resetGame,
-                selectedCell = null,
-                conflictCells = emptySet(),
-                highlightedCells = emptySet(),
-                sameNumberCells = emptySet(),
-                notes = clearedNotes,
-                mistakes = 0,
-                numberCounts = computeNumberCounts(freshBoard.board),  // ← fixes the reset count bug
-                lastPlacedCell = null,
-                lastMistakeCell = null,
-                isNotesMode = false
-            )
+    fun onResetBoard() {
+        viewModelScope.launch {
+            moveMutex.withLock {
+                val game = currentGame ?: return@withLock
+                val freshBoard = game.initialBoard.deepCopy()
+                val clearedNotes = Notes()
+                val resetGame = game.copy(
+                    board = freshBoard,
+                    state = GameState.PLAYING,
+                    hintsUsed = 0,
+                    mistakes = 0,
+                    notes = clearedNotes,
+                    completedAt = null
+                )
+                currentGame = resetGame
+                moveHistory.clear()
+                moveIndex = -1
+                soundManager.playClick()
+                _uiState.update {
+                    it.copy(
+                        game = resetGame,
+                        selectedCell = null,
+                        conflictCells = emptySet(),
+                        highlightedCells = emptySet(),
+                        sameNumberCells = emptySet(),
+                        notes = clearedNotes,
+                        mistakes = 0,
+                        numberCounts = computeNumberCounts(freshBoard.board),
+                        lastPlacedCell = null,
+                        lastMistakeCell = null,
+                        isNotesMode = false,
+                        showCompletionDialog = false,
+                        showGameOverDialog = false,
+                        showHint = null,
+                        hintMessage = null
+                    )
+                }
+                startTimer()
+                gameRepository.updateGame(resetGame)
+            }
         }
-        if (resetGame.state == GameState.PLAYING) {
-            Log.d(TAG, "onResetBoard() restarting timer")
-            startTimer()
-        }
-        Log.d(TAG, "onResetBoard() END")
     }
 
     // -------------------------------------------------------------------------
@@ -757,25 +698,29 @@ class GameViewModel @Inject constructor(
     fun onPauseToggle() {
         when (currentGame?.state) {
             GameState.PLAYING -> pauseGame()
-            GameState.PAUSED  -> resumeGame()
+            GameState.PAUSED -> resumeGame()
             else -> {}
         }
     }
 
+    /** Call this from the screen's ON_STOP lifecycle event so the timer doesn't run in the background. */
+    fun onAppBackgrounded() {
+        if (currentGame?.state == GameState.PLAYING) pauseGame()
+    }
+
     private fun pauseGame() {
         val game = currentGame ?: return
+        if (game.state != GameState.PLAYING) return
         stopTimer()
-        val paused = game.copy(state = GameState.PAUSED, currentTime = game.currentTime)
+        val paused = game.copy(state = GameState.PAUSED)
         currentGame = paused
-        viewModelScope.launch {
-            gameRepository.updateGame(paused)
-            _uiState.update { it.copy(game = paused) }
-        }
+        _uiState.update { it.copy(game = paused) }
+        persistLatest()
     }
 
     private fun resumeGame() {
         val game = currentGame ?: return
-        if (game.state == GameState.PLAYING) return
+        if (game.state != GameState.PAUSED) return   // FIX: never revive LOST / COMPLETED games
         val now = DateUtils.getCurrentTimestamp()
         val elapsed = game.elapsedTime
         val resumed = game.copy(
@@ -795,13 +740,16 @@ class GameViewModel @Inject constructor(
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
+            var ticks = 0
             while (currentGame?.state == GameState.PLAYING) {
                 delay(1000L)
-                currentGame?.let { g ->
-                    val updated = g.copy(currentTime = g.currentTime + 1000L)
-                    currentGame = updated
-                    _uiState.update { it.copy(game = updated) }
-                }
+                val g = currentGame ?: break
+                if (g.state != GameState.PLAYING) break
+                val updated = g.copy(currentTime = g.currentTime + 1000L)
+                currentGame = updated
+                _uiState.update { it.copy(game = updated) }
+                // Save progress every 10s so a killed process doesn't lose the elapsed time
+                if (++ticks % 10 == 0) persistLatest()
             }
         }
     }
@@ -849,21 +797,15 @@ class GameViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopTimer()
-        // Auto-pause game using application scope (survives ViewModel destruction)
-        currentGame?.let { game ->
-            if (game.state == GameState.PLAYING) {
-                applicationScope.launch {  // ✅ Use application scope
-                    try {
-                        gameRepository.updateGame(
-                            game.copy(
-                                state = GameState.PAUSED,
-                                currentTime = System.currentTimeMillis()
-                            )
-                        )
-                        Log.d("GameVM", "Game auto-paused on ViewModel destruction")
-                    } catch (e: Exception) {
-                        Log.e("GameVM", "Failed to auto-pause game", e)
-                    }
+        val game = currentGame
+        if (game != null && game.state == GameState.PLAYING) {
+            applicationScope.launch {
+                try {
+                    // FIX: keep the game's own clock (same as pauseGame), not the wall clock
+                    gameRepository.updateGame(game.copy(state = GameState.PAUSED))
+                    Log.d(TAG, "Game auto-paused on ViewModel destruction")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to auto-pause game", e)
                 }
             }
         }

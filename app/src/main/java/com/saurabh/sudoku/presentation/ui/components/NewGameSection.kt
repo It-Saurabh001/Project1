@@ -37,13 +37,6 @@ fun NewGameSection(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = "Start New Game",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
             DifficultySelector(
                 selectedDifficulty = selectedDifficulty,
                 onDifficultySelected = onDifficultySelected,

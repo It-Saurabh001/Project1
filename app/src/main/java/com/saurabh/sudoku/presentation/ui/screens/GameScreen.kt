@@ -25,6 +25,7 @@ import com.saurabh.sudoku.presentation.viewmodel.GameViewModel
 import com.saurabh.sudoku.presentation.viewmodel.SettingsViewModel
 import com.saurabh.sudoku.presentation.utils.Constants
 import com.saurabh.sudoku.presentation.utils.OnLifecycleEvent
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,13 +75,13 @@ fun GameScreen(
     // Clear animation states after one frame
     LaunchedEffect(uiState.lastPlacedCell) {
         if (uiState.lastPlacedCell != null) {
-            kotlinx.coroutines.delay(350)
+            kotlinx.coroutines.delay(350.milliseconds)
             gameViewModel.clearLastPlacedCell()
         }
     }
     LaunchedEffect(uiState.lastMistakeCell) {
         if (uiState.lastMistakeCell != null) {
-            kotlinx.coroutines.delay(400)
+            kotlinx.coroutines.delay(400.milliseconds)
             gameViewModel.clearLastMistakeCell()
         }
     }
@@ -110,112 +111,121 @@ fun GameScreen(
 
     val game = uiState.game ?: return
 
-    // Completion dialog
-    if (uiState.showCompletionDialog && uiState.completionTime != null) {
-        Log.d(TAG, "Showing completion dialog for game ${game.id.take(8)}, time: ${uiState.completionTime}, hints: ${game.hintsUsed}")
-        GameCompletedDialog(
-            difficulty = game.difficulty,
-            completionTime = uiState.completionTime!!,
-            hintsUsed = game.hintsUsed,
-            onNewGame = { gameViewModel.dismissCompletionDialog(); gameViewModel.onNewGame() },
-            onMainMenu = { gameViewModel.dismissCompletionDialog(); onNavigateBack() }
-        )
-    }
+    // Completion dialog is rendered as an overlay inside the main Box below.
+    // (Kept here as a comment so the logic is easy to find.)
 
     // New game generating
     if (uiState.isGeneratingNewGame) {
         LoadingDialog(message = "Generating new puzzle…")
     }
 
-    Scaffold(
-        modifier = modifier.testTag("game_screen").fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "${game.difficulty.displayName} Sudoku",
-                        style = MaterialTheme.typography.titleMedium
+    // Root Box — Scaffold underneath, celebration dialog as a full-screen overlay on top
+    Box(modifier = modifier.fillMaxSize()) {
+
+        Scaffold(
+            modifier = Modifier.testTag("game_screen").fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "${game.difficulty.displayName} Sudoku",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Toolbar: timer, mistakes, notes toggle, action buttons
-            GameToolbar(
-                elapsedTime       = game.elapsedTime,
-                hintsRemaining    = Constants.MAX_HINTS - game.hintsUsed,
-                isPaused          = game.state == GameState.PAUSED,
-                mistakes          = game.mistakes,
-                maxMistakes       = game.maxMistakes,
-                isNotesMode       = if (notesModeSetting) uiState.isNotesMode else false,
-                onNotesModeToggle = gameViewModel::toggleNotesMode,
-                onPauseClick      = gameViewModel::onPauseToggle,
-                onHintClick       = gameViewModel::onHintRequested,
-                onUndoClick       = gameViewModel::onUndoMove,
-                onRedoClick       = gameViewModel::onRedoMove,
-                onResetClick      = gameViewModel::onResetBoard,
-                modifier          = Modifier.fillMaxWidth()
-            )
-
-            // Game Over inline dialog
-            if (uiState.showGameOverDialog) {
-                Log.d(TAG, "Showing game over dialog for game ${game.id.take(8)}, mistakes: ${game.mistakes}/${game.maxMistakes}")
-                GameOverDialog(
-                    difficulty  = game.difficulty,
-                    mistakes    = game.mistakes,
-                    maxMistakes = game.maxMistakes,
-                    onTryAgain  = { gameViewModel.dismissGameOverDialog(); gameViewModel.onNewGame() },
-                    onMainMenu  = { gameViewModel.dismissGameOverDialog(); onNavigateBack() }
                 )
             }
-
-            // Sudoku board — passes all highlight/animation state
-            SudokuBoard(
-                board            = game.board,
-                notes            = uiState.notes,
-                selectedCell     = uiState.selectedCell,
-                highlightedCells = uiState.highlightedCells,
-                sameNumberCells  = uiState.sameNumberCells,
-                conflictCells    = uiState.conflictCells,
-                highlightErrors  = highlightErrors,
-                isNotesMode      = uiState.isNotesMode,
-                lastPlacedCell   = uiState.lastPlacedCell,
-                lastMistakeCell  = uiState.lastMistakeCell,
-                onCellClick      = gameViewModel::onCellSelected,
+        ) { innerPadding ->
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-            )
-
-            // Number pad (hidden when game is finished)
-            AnimatedVisibility(
-                visible = game.state != GameState.COMPLETED && game.state != GameState.LOST,
-                enter   = fadeIn() + expandVertically(),
-                exit    = fadeOut() + shrinkVertically()
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
             ) {
-                NumberPad(
-                    numberCounts     = uiState.numberCounts,
-                    onNumberSelected = gameViewModel::onNumberSelected,
-                    onEraseSelected  = gameViewModel::onEraseSelected,
-                    modifier         = Modifier.fillMaxWidth()
+                // Toolbar: timer, mistakes, notes toggle, action buttons
+                GameToolbar(
+                    elapsedTime       = game.elapsedTime,
+                    hintsRemaining    = Constants.MAX_HINTS - game.hintsUsed,
+                    isPaused          = game.state == GameState.PAUSED,
+                    mistakes          = game.mistakes,
+                    maxMistakes       = game.maxMistakes,
+                    isNotesMode       = if (notesModeSetting) uiState.isNotesMode else false,
+                    onNotesModeToggle = gameViewModel::toggleNotesMode,
+                    onPauseClick      = gameViewModel::onPauseToggle,
+                    onHintClick       = gameViewModel::onHintRequested,
+                    onUndoClick       = gameViewModel::onUndoMove,
+                    onRedoClick       = gameViewModel::onRedoMove,
+                    onResetClick      = gameViewModel::onResetBoard,
+                    modifier          = Modifier.fillMaxWidth()
                 )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Game Over inline dialog
+                if (uiState.showGameOverDialog) {
+                    Log.d(TAG, "Showing game over dialog for game ${game.id.take(8)}, mistakes: ${game.mistakes}/${game.maxMistakes}")
+                    GameOverDialog(
+                        difficulty  = game.difficulty,
+                        mistakes    = game.mistakes,
+                        maxMistakes = game.maxMistakes,
+                        onTryAgain  = { gameViewModel.dismissGameOverDialog(); gameViewModel.onNewGame() },
+                        onMainMenu  = { gameViewModel.dismissGameOverDialog(); onNavigateBack() }
+                    )
+                }
+
+                // Sudoku board — passes all highlight/animation state
+                SudokuBoard(
+                    board            = game.board,
+                    notes            = uiState.notes,
+                    selectedCell     = uiState.selectedCell,
+                    highlightedCells = uiState.highlightedCells,
+                    sameNumberCells  = uiState.sameNumberCells,
+                    conflictCells    = uiState.conflictCells,
+                    highlightErrors  = highlightErrors,
+                    isNotesMode      = uiState.isNotesMode,
+                    lastPlacedCell   = uiState.lastPlacedCell,
+                    lastMistakeCell  = uiState.lastMistakeCell,
+                    onCellClick      = gameViewModel::onCellSelected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                )
+
+                // Number pad (hidden when game is finished)
+                AnimatedVisibility(
+                    visible = game.state != GameState.COMPLETED && game.state != GameState.LOST,
+                    enter   = fadeIn() + expandVertically(),
+                    exit    = fadeOut() + shrinkVertically()
+                ) {
+                    NumberPad(
+                        numberCounts     = uiState.numberCounts,
+                        onNumberSelected = gameViewModel::onNumberSelected,
+                        onEraseSelected  = gameViewModel::onEraseSelected,
+                        modifier         = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        // ── Win celebration overlay ───────────────────────────────────────────
+        // Shown as a Dialog on top of the Scaffold so the animation card is
+        // perfectly centred on all screen sizes and orientations.
+        if (uiState.showCompletionDialog && uiState.completionTime != null) {
+            Log.d(TAG, "Showing completion dialog — game ${game.id.take(8)}, time: ${uiState.completionTime}, hints: ${game.hintsUsed}")
+            GameCompletedDialog(
+                difficulty     = game.difficulty,
+                completionTime = uiState.completionTime!!,
+                hintsUsed      = game.hintsUsed,
+                onNewGame      = { gameViewModel.dismissCompletionDialog(); gameViewModel.onNewGame() },
+                onMainMenu     = { gameViewModel.dismissCompletionDialog(); onNavigateBack() }
+            )
         }
     }
 }

@@ -31,7 +31,7 @@ fun DifficultySelector(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        Difficulty.values().forEach { difficulty ->
+        Difficulty.entries.forEach { difficulty ->
             DifficultyOption(
                 difficulty = difficulty,
                 selected = selectedDifficulty == difficulty,
