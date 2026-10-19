@@ -5,6 +5,7 @@ sealed class SudokuScreen(val route: String) {
     object Home : SudokuScreen("home")
     object Statistics : SudokuScreen("statistics")
     object Settings : SudokuScreen("settings")
+    object TrophyRoom : SudokuScreen("trophy_room")
     object Game : SudokuScreen("game/{gameId}") {
         fun createRoute(gameId: String) = "game/$gameId"
         val arguments = listOf(

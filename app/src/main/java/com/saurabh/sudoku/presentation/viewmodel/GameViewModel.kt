@@ -220,8 +220,8 @@ class GameViewModel @Inject constructor(
         // ---- NOTES MODE ----
         if (state.isNotesMode && currentValue == 0) {
             Log.d(TAG, "onNumberSelected() notes mode: toggling note $number at ($row, $col)")
-            val notesBefore = game.notes.copy()
-            val newNotes = game.notes.copy()
+            val notesBefore = game.notes.deepCopy()
+            val newNotes = game.notes.deepCopy()
             if (newNotes.getNotes(row, col).contains(number)) {
                 newNotes.removeNote(row, col, number)
             } else {
@@ -246,7 +246,7 @@ class GameViewModel @Inject constructor(
             resumeGame()
         }
         Log.d(TAG, "onNumberSelected() number mode: placing $number at ($row, $col)")
-        viewModelScope.launch { makeMove(row, col, number, game.notes.copy()) }
+        viewModelScope.launch { makeMove(row, col, number, game.notes.deepCopy()) }
     }
 
     fun onEraseSelected() {
@@ -266,7 +266,7 @@ class GameViewModel @Inject constructor(
 
         // Erase notes first (if cell is empty but has notes)
         if (currentValue == 0 && hasNotes) {
-            val newNotes = game.notes.copy()
+            val newNotes = game.notes.deepCopy()
             newNotes.clearNotes(row, col)
             val updatedGame = game.copy(notes = newNotes, currentTime = game.currentTime)
             currentGame = updatedGame
@@ -279,7 +279,7 @@ class GameViewModel @Inject constructor(
 
         // Erase the number — push to undo history
         if (currentGame?.state != GameState.PLAYING) resumeGame()
-        viewModelScope.launch { makeMove(row, col, 0, game.notes.copy()) }
+        viewModelScope.launch { makeMove(row, col, 0, game.notes.deepCopy()) }
     }
 
     // -------------------------------------------------------------------------
@@ -358,7 +358,7 @@ class GameViewModel @Inject constructor(
             newBoard[row][col] = number
 
             // Auto-remove notes in same row/col/box when placing a correct number
-            val notesAfter = notesBefore.copy()
+            val notesAfter = notesBefore.deepCopy()
             if (number != 0 && validation.isValid) {
                 Log.d(TAG, "makeMove() auto-removing notes for $number")
                 notesAfter.autoRemoveNotes(row, col, number, newBoard)
@@ -630,7 +630,7 @@ class GameViewModel @Inject constructor(
     }
 
     private suspend fun applyHintAt(game: Game, r: Int, c: Int, value: Int) {
-        val clearedNotes = game.notes.copy()
+        val clearedNotes = game.notes.deepCopy()
         clearedNotes.clearNotes(r, c)
 
         val newBoard = game.board.board.map { it.clone() }.toTypedArray()
@@ -638,7 +638,7 @@ class GameViewModel @Inject constructor(
         clearedNotes.autoRemoveNotes(r, c, value, newBoard)
 
         // Hints also push to undo history
-        val notesBefore = game.notes.copy()
+        val notesBefore = game.notes.deepCopy()
         if (moveIndex < moveHistory.size - 1) {
             moveHistory.subList(moveIndex + 1, moveHistory.size).clear()
         }

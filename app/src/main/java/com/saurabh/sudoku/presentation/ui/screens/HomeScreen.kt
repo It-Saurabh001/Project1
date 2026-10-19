@@ -26,6 +26,7 @@ fun HomeScreen(
     onNavigateToGame: (String) -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToTrophyRoom: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -91,12 +92,21 @@ fun HomeScreen(
             )
 
             // Quick Stats
-            statistics?.let { stats ->
-                QuickStatsCard(
-                    statistics = stats,
-                    onViewAllStats = onNavigateToStatistics,
-                    modifier = Modifier.fillMaxWidth()
+            QuickStatsCard(
+                statistics = statistics,
+                onViewAllStats = onNavigateToStatistics,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Trophy Room Button
+            Button(
+                onClick = onNavigateToTrophyRoom,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
                 )
+            ) {
+                Text("🏆 Trophy Room")
             }
 
             // Settings Button

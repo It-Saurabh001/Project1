@@ -11,6 +11,7 @@ import com.saurabh.sudoku.presentation.ui.screens.GameScreen
 import com.saurabh.sudoku.presentation.ui.screens.HomeScreen
 import com.saurabh.sudoku.presentation.ui.screens.SettingsScreen
 import com.saurabh.sudoku.presentation.ui.screens.StatisticsScreen
+import com.saurabh.sudoku.presentation.ui.screens.TrophyRoomScreen
 
 
 @Composable
@@ -39,6 +40,10 @@ fun SudokuNavigation(
                 onNavigateToSettings = {
                     Log.d(TAG, "Navigating to SettingsScreen")
                     navController.navigate(SudokuScreen.Settings.route)
+                },
+                onNavigateToTrophyRoom = {
+                    Log.d(TAG, "Navigating to TrophyRoomScreen")
+                    navController.navigate(SudokuScreen.TrophyRoom.route)
                 }
             )
         }
@@ -73,6 +78,16 @@ fun SudokuNavigation(
             SettingsScreen(
                 onNavigateBack = {
                     Log.d(TAG, "Navigating back from SettingsScreen")
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(route = SudokuScreen.TrophyRoom.route) {
+            Log.d(TAG, "Navigating to TrophyRoomScreen")
+            TrophyRoomScreen(
+                onNavigateBack = {
+                    Log.d(TAG, "Navigating back from TrophyRoomScreen")
                     navController.popBackStack()
                 }
             )

@@ -6,6 +6,15 @@ data class Notes(
     val notes: Array<Array<MutableSet<Int>>> = Array(9) { Array(9) { mutableSetOf() } }
 ) : Serializable {  // <-- CHANGE: Parcelable → Serializable
 
+    fun deepCopy(): Notes {
+        val newNotesArray = Array(9) { r ->
+            Array(9) { c ->
+                notes[r][c].toMutableSet()
+            }
+        }
+        return Notes(newNotesArray)
+    }
+
     fun addNote(row: Int, col: Int, number: Int) {
         if (number in 1..9) {
             notes[row][col].add(number)
