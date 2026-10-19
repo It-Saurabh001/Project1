@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.saurabh.sudoku.data.generator.SudokuGenerator
+import com.saurabh.sudoku.di.ApplicationScope
 import com.saurabh.sudoku.domain.model.*
 import com.saurabh.sudoku.domain.repository.GameRepository
 import com.saurabh.sudoku.domain.repository.StatisticsRepository
@@ -15,10 +16,13 @@ import com.saurabh.sudoku.presentation.utils.GameUtils
 import com.saurabh.sudoku.presentation.utils.SoundManager
 import com.saurabh.sudoku.presentation.utils.deepCopy
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import javax.inject.Inject
 
@@ -28,8 +32,11 @@ class GameViewModel @Inject constructor(
     private val statisticsRepository: StatisticsRepository,
     private val sudokuGenerator: SudokuGenerator,
     private val validateMoveUseCase: ValidateMoveUseCase,
-    private val soundManager: SoundManager
+    private val soundManager: SoundManager,
+    @ApplicationScope private val applicationScope: CoroutineScope
+
 ) : ViewModel() {
+    private val moveMutex = Mutex()
 
     private val TAG = "GameViewModel"
     private val DEBUG = android.os.Build.TYPE != "user"
@@ -246,7 +253,7 @@ class GameViewModel @Inject constructor(
             resumeGame()
         }
         Log.d(TAG, "onNumberSelected() number mode: placing $number at ($row, $col)")
-        viewModelScope.launch { makeMove(row, col, number, game.notes.deepCopy()) }
+        viewModelScope.launch { moveMutex.withLock { makeMove(row, col, number, game.notes.deepCopy()) } }
     }
 
     fun onEraseSelected() {
@@ -279,7 +286,7 @@ class GameViewModel @Inject constructor(
 
         // Erase the number — push to undo history
         if (currentGame?.state != GameState.PLAYING) resumeGame()
-        viewModelScope.launch { makeMove(row, col, 0, game.notes.deepCopy()) }
+        viewModelScope.launch { moveMutex.withLock { makeMove(row, col, 0, game.notes.deepCopy()) } }
     }
 
     // -------------------------------------------------------------------------
@@ -472,30 +479,51 @@ class GameViewModel @Inject constructor(
 
     fun onUndoMove() {
         Log.d(TAG, "onUndoMove() moveIndex=$moveIndex")
+        // Quick pre-check without lock — avoids launching a coroutine needlessly.
+        // The authoritative check happens inside the lock.
         if (moveIndex < 0) {
-            Log.d(TAG, "onUndoMove() nothing to undo")
+            Log.d(TAG, "onUndoMove() nothing to undo (fast path)")
             showToast("Nothing to undo")
             return
         }
-        val move = moveHistory[moveIndex]
-        Log.d(TAG, "onUndoMove() undoing move at (${move.row}, ${move.col}) from ${move.newValue} back to ${move.oldValue}")
-        moveIndex--
-        applyBoardChange(move.row, move.col, move.oldValue, move.notesBefore)
-        soundManager.playClick()
+        viewModelScope.launch {
+            moveMutex.withLock {
+                if (moveIndex < 0) {
+                    Log.d(TAG, "onUndoMove() nothing to undo")
+                    showToast("Nothing to undo")
+                    return@withLock
+                }
+                val move = moveHistory[moveIndex]
+                Log.d(TAG, "onUndoMove() undoing move at (${move.row}, ${move.col}) from ${move.newValue} back to ${move.oldValue}")
+                moveIndex--
+                applyBoardChange(move.row, move.col, move.oldValue, move.notesBefore)
+                soundManager.playClick()
+            }
+        }
     }
 
     fun onRedoMove() {
         Log.d(TAG, "onRedoMove() moveIndex=$moveIndex, historySize=${moveHistory.size}")
+        // Quick pre-check without lock — avoids launching a coroutine needlessly.
         if (moveIndex >= moveHistory.size - 1) {
-            Log.d(TAG, "onRedoMove() nothing to redo")
+            Log.d(TAG, "onRedoMove() nothing to redo (fast path)")
             showToast("Nothing to redo")
             return
         }
-        moveIndex++
-        val move = moveHistory[moveIndex]
-        Log.d(TAG, "onRedoMove() redoing move at (${move.row}, ${move.col}) from ${move.oldValue} to ${move.newValue}")
-        applyBoardChange(move.row, move.col, move.newValue, move.notesAfter)
-        soundManager.playClick()
+        viewModelScope.launch {
+            moveMutex.withLock {
+                if (moveIndex >= moveHistory.size - 1) {
+                    Log.d(TAG, "onRedoMove() nothing to redo")
+                    showToast("Nothing to redo")
+                    return@withLock
+                }
+                moveIndex++
+                val move = moveHistory[moveIndex]
+                Log.d(TAG, "onRedoMove() redoing move at (${move.row}, ${move.col}) from ${move.oldValue} to ${move.newValue}")
+                applyBoardChange(move.row, move.col, move.newValue, move.notesAfter)
+                soundManager.playClick()
+            }
+        }
     }
 
     private fun applyBoardChange(row: Int, col: Int, value: Int, notes: Notes) {
@@ -626,7 +654,7 @@ class GameViewModel @Inject constructor(
             return
         }
         Log.d(TAG, "onHintRequested() hint found: value ${hint.value} for ($r, $c)")
-        viewModelScope.launch { applyHintAt(game, r, c, hint.value) }
+        viewModelScope.launch { moveMutex.withLock { applyHintAt(game, r, c, hint.value) } }
     }
 
     private suspend fun applyHintAt(game: Game, r: Int, c: Int, value: Int) {
@@ -821,12 +849,21 @@ class GameViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopTimer()
+        // Auto-pause game using application scope (survives ViewModel destruction)
         currentGame?.let { game ->
             if (game.state == GameState.PLAYING) {
-                viewModelScope.launch {
-                    gameRepository.updateGame(
-                        game.copy(state = GameState.PAUSED, currentTime = game.currentTime)
-                    )
+                applicationScope.launch {  // ✅ Use application scope
+                    try {
+                        gameRepository.updateGame(
+                            game.copy(
+                                state = GameState.PAUSED,
+                                currentTime = System.currentTimeMillis()
+                            )
+                        )
+                        Log.d("GameVM", "Game auto-paused on ViewModel destruction")
+                    } catch (e: Exception) {
+                        Log.e("GameVM", "Failed to auto-pause game", e)
+                    }
                 }
             }
         }

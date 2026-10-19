@@ -2,6 +2,7 @@
 agp = "8.13.2"
 coilCompose = "2.7.0"
 datastorePreferences = "1.2.0"
+dotlottieAndroid = "0.5.0"
 gson = "2.13.2"
 kotlin = "2.3.10"
 coreKtx = "1.17.0"
@@ -30,6 +31,7 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomCompiler" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
+dotlottie-android = { module = "com.lottiefiles:dotlottie-android", version.ref = "dotlottieAndroid" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

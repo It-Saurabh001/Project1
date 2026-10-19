@@ -24,7 +24,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -86,5 +87,5 @@ dependencies {
     // Gson for JSON serialization
     implementation(libs.gson)
 
-//    implementation("org.jetbrains.kotlinx:kotlinx-parcelize-runtime:1.7.3")
+    implementation(libs.dotlottie.android)
 }
